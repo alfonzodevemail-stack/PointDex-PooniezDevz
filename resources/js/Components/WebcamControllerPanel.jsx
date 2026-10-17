@@ -5,8 +5,7 @@ import {
     Volume2,
     VolumeX,
     Eye,
-    EyeOff,
-    Zap
+    EyeOff
 } from 'lucide-react';
 import { GestureEngine } from '@/Services/GestureRecognizer';
 
@@ -20,29 +19,24 @@ export default function WebcamControllerPanel({
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
 
-    // States
     const [isEngineOn, setIsEngineOn] = useState(true);
-    const [cameraStatus, setCameraStatus] = useState('offline'); // offline, connecting, online, error
-    const [handStatus, setHandStatus] = useState('none'); // none, searching, detected
+    const [cameraStatus, setCameraStatus] = useState('offline');
+    const [handStatus, setHandStatus] = useState('none');
     const [detectedGesture, setDetectedGesture] = useState(null);
     const [cooldownPercent, setCooldownPercent] = useState(100);
     const [remainingCooldownMs, setRemainingCooldownMs] = useState(0);
 
-    // Sliders & Toggles
     const [sensitivity, setSensitivity] = useState(settings.sensitivity || 5);
     const [cooldownMs, setCooldownMs] = useState(settings.cooldown_ms || 800);
     const [audioFeedback, setAudioFeedback] = useState(settings.audio_feedback ?? true);
     const [showLandmarks, setShowLandmarks] = useState(settings.show_landmark_canvas ?? true);
 
-    // Devices
     const [devices, setDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
 
-    // Telemetry
     const [fps, setFps] = useState(0);
     const [latencyMs, setLatencyMs] = useState(0);
 
-    // Populate camera devices
     useEffect(() => {
         const getDevices = async () => {
             try {
@@ -53,7 +47,7 @@ export default function WebcamControllerPanel({
                     setSelectedDeviceId(videoDevs[0].deviceId);
                 }
             } catch (e) {
-                console.warn('Could not enumerate camera devices:', e);
+                console.warn(e);
             }
         };
 
@@ -62,7 +56,6 @@ export default function WebcamControllerPanel({
         return () => navigator.mediaDevices.removeEventListener?.('devicechange', getDevices);
     }, []);
 
-    // Initialize or restart engine
     useEffect(() => {
         if (!isEngineOn) {
             if (engineRef.current) {
@@ -77,9 +70,9 @@ export default function WebcamControllerPanel({
         const engine = new GestureEngine({
             videoElement: videoRef.current,
             canvasElement: canvasRef.current,
-            sensitivity: sensitivity,
-            cooldownMs: cooldownMs,
-            audioFeedback: audioFeedback,
+            sensitivity,
+            cooldownMs,
+            audioFeedback,
             showLandmarkCanvas: showLandmarks,
             onGestureDetected: (gesture) => {
                 setDetectedGesture(gesture);
@@ -99,12 +92,12 @@ export default function WebcamControllerPanel({
                             delta_y: gesture.deltaY,
                             is_successful: true
                         })
-                    }).catch(err => console.warn('Telemetry log failed:', err));
+                    }).catch(() => {});
                 }
 
                 setTimeout(() => {
                     setDetectedGesture(null);
-                }, 1800);
+                }, 1500);
             },
             onStatusChange: (status) => {
                 if (status.camera) setCameraStatus(status.camera);
@@ -122,9 +115,7 @@ export default function WebcamControllerPanel({
         });
 
         engineRef.current = engine;
-        engine.initialize(selectedDeviceId).catch((e) => {
-            console.error('Engine start failed:', e);
-        });
+        engine.initialize(selectedDeviceId).catch(() => {});
 
         return () => {
             if (engineRef.current) {
@@ -134,7 +125,6 @@ export default function WebcamControllerPanel({
         };
     }, [isEngineOn, selectedDeviceId]);
 
-    // Live update settings without restarting camera
     useEffect(() => {
         if (engineRef.current) {
             engineRef.current.updateConfig({
@@ -148,15 +138,9 @@ export default function WebcamControllerPanel({
 
     return (
         <div className="clay-card p-5 flex flex-col space-y-4">
-            {/* Webcam Viewport + "Preview" Caption (Matches Figure 4.1 Top Right) */}
             <div>
                 <div className="relative rounded-2xl overflow-hidden bg-clay-charcoal border-4 border-white shadow-md aspect-[4/3] flex items-center justify-center">
-                    <video
-                        ref={videoRef}
-                        playsInline
-                        muted
-                        className="hidden"
-                    />
+                    <video ref={videoRef} playsInline muted className="hidden" />
 
                     <canvas
                         ref={canvasRef}
@@ -167,36 +151,23 @@ export default function WebcamControllerPanel({
                         }`}
                     />
 
-                    {/* Cooldown Lock Pill */}
                     {remainingCooldownMs > 0 && (
-                        <div className="absolute top-2.5 right-2.5 clay-btn-gold px-2.5 py-0.5 text-[10px] font-black flex items-center space-x-1">
-                            <Zap className="w-3 h-3" />
-                            <span>{remainingCooldownMs}ms</span>
+                        <div className="absolute top-2.5 right-2.5 clay-btn-gold px-2.5 py-0.5 text-[10px] font-black">
+                            Wait {remainingCooldownMs}ms
                         </div>
                     )}
 
-                    {/* Active Gesture Overlay Toast */}
                     {detectedGesture && (
-                        <div className="absolute inset-0 bg-clay-charcoal/75 backdrop-blur-xs flex flex-col items-center justify-center p-3">
-                            <div className="clay-btn-gold px-4 py-2 text-sm font-black flex items-center space-x-2">
-                                <span>
-                                    {detectedGesture.type === 'swipe_right'
-                                        ? '👉'
-                                        : detectedGesture.type === 'swipe_left'
-                                        ? '👈'
-                                        : '✊'}
-                                </span>
-                                <span>{detectedGesture.label}</span>
+                        <div className="absolute inset-0 bg-clay-charcoal/75 flex flex-col items-center justify-center p-3">
+                            <div className="clay-btn-gold px-4 py-1.5 text-xs font-black">
+                                {detectedGesture.label}
                             </div>
-                            <span className="text-[11px] text-clay-cream mt-1.5 font-mono font-semibold">
-                                {detectedGesture.key} ({latencyMs}ms)
-                            </span>
                         </div>
                     )}
 
                     {!isEngineOn && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-clay-gray space-y-1">
-                            <VideoOff className="w-8 h-8" />
+                            <VideoOff className="w-7 h-7" />
                             <span className="text-xs font-semibold">Camera Off</span>
                         </div>
                     )}
@@ -207,14 +178,13 @@ export default function WebcamControllerPanel({
                 </p>
             </div>
 
-            {/* Status Badges (Matches Figure 4.1: Camera | Hand | Gesture) */}
+            {/* Status Indicators */}
             <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                    {/* Camera Badge */}
                     <div className="flex items-center space-x-1.5">
                         <span className="font-bold text-clay-charcoal text-[11px]">Camera:</span>
                         <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-xs ${
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
                                 cameraStatus === 'online'
                                     ? 'bg-emerald-600 text-white'
                                     : 'bg-clay-gray text-clay-charcoal'
@@ -224,7 +194,6 @@ export default function WebcamControllerPanel({
                         </span>
                     </div>
 
-                    {/* Hand Badge */}
                     <div className="flex items-center space-x-1.5">
                         <span className="font-bold text-clay-charcoal text-[11px]">Hand:</span>
                         <span
@@ -234,12 +203,11 @@ export default function WebcamControllerPanel({
                                     : 'bg-clay-charcoal text-clay-cream'
                             }`}
                         >
-                            {handStatus === 'detected' ? 'Detected' : isEngineOn ? 'Searching' : 'Gesture Off'}
+                            {handStatus === 'detected' ? 'Detected' : isEngineOn ? 'None' : 'Gesture Off'}
                         </span>
                     </div>
                 </div>
 
-                {/* Gesture Status Row */}
                 <div className="flex items-center space-x-2 pt-0.5">
                     <span className="font-bold text-clay-charcoal text-[11px]">Gesture:</span>
                     <span
@@ -258,7 +226,7 @@ export default function WebcamControllerPanel({
                 </div>
             </div>
 
-            {/* Gesture Off / On Switch (Matches Figure 4.1) */}
+            {/* Gesture Switch */}
             <div className="pt-2 border-t border-clay-gray/50 flex items-center justify-between">
                 <div>
                     <div className="text-xs font-extrabold text-clay-charcoal">Gesture</div>
@@ -290,7 +258,7 @@ export default function WebcamControllerPanel({
                 </div>
             </div>
 
-            {/* Input Device Dropdown (Matches Figure 4.1) */}
+            {/* Camera Select */}
             <div className="space-y-1.5 pt-2 border-t border-clay-gray/50">
                 <label className="block text-xs font-extrabold text-clay-charcoal">
                     Input Device
@@ -298,7 +266,7 @@ export default function WebcamControllerPanel({
                 <select
                     value={selectedDeviceId}
                     onChange={(e) => setSelectedDeviceId(e.target.value)}
-                    className="w-full clay-inset text-xs font-semibold text-clay-charcoal px-3 py-2 focus:outline-none focus:ring-2 focus:ring-clay-gold"
+                    className="w-full clay-inset text-xs font-semibold text-clay-charcoal px-3 py-2 focus:outline-none"
                 >
                     {devices.length === 0 ? (
                         <option value="">Default Webcam</option>
@@ -312,15 +280,12 @@ export default function WebcamControllerPanel({
                 </select>
             </div>
 
-            {/* Live Calibration Sliders (Sensitivity & Cooldown) */}
+            {/* Sliders */}
             <div className="space-y-3 pt-2 border-t border-clay-gray/50">
-                {/* Sensitivity */}
                 <div className="space-y-1">
                     <div className="flex justify-between text-[11px] font-bold text-clay-charcoal">
                         <span>Sensitivity</span>
-                        <span className="font-mono bg-clay-gold/30 px-1.5 rounded text-clay-charcoal">
-                            {sensitivity}/10
-                        </span>
+                        <span className="font-mono">{sensitivity}/10</span>
                     </div>
                     <input
                         type="range"
@@ -332,13 +297,10 @@ export default function WebcamControllerPanel({
                     />
                 </div>
 
-                {/* Cooldown */}
                 <div className="space-y-1">
                     <div className="flex justify-between text-[11px] font-bold text-clay-charcoal">
-                        <span>Cooldown Timer</span>
-                        <span className="font-mono bg-clay-gold/30 px-1.5 rounded text-clay-charcoal">
-                            {cooldownMs}ms
-                        </span>
+                        <span>Cooldown</span>
+                        <span className="font-mono">{cooldownMs}ms</span>
                     </div>
                     <input
                         type="range"
@@ -351,7 +313,6 @@ export default function WebcamControllerPanel({
                     />
                 </div>
 
-                {/* Cooldown Progress Bar */}
                 <div className="w-full clay-inset h-2 rounded-full overflow-hidden">
                     <div
                         className={`h-full transition-all duration-75 ${
@@ -361,7 +322,6 @@ export default function WebcamControllerPanel({
                     />
                 </div>
 
-                {/* Audio & Skeleton Quick Toggles */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                         type="button"
@@ -371,7 +331,7 @@ export default function WebcamControllerPanel({
                         }`}
                     >
                         {audioFeedback ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-                        <span>Beep</span>
+                        <span>Sound</span>
                     </button>
 
                     <button
@@ -382,19 +342,18 @@ export default function WebcamControllerPanel({
                         }`}
                     >
                         {showLandmarks ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                        <span>Skeleton</span>
+                        <span>Overlay</span>
                     </button>
                 </div>
             </div>
 
-            {/* Bottom Telemetry Bar (FPS & Latency) */}
             <div className="clay-inset px-3 py-2 flex items-center justify-between text-[11px] font-mono font-bold text-clay-charcoal">
                 <div className="flex items-center space-x-1">
                     <Activity className="w-3.5 h-3.5 text-clay-charcoal" />
-                    <span>FPS: {fps || '--'}</span>
+                    <span>FPS: {fps || 0}</span>
                 </div>
                 <div>
-                    <span>Latency: {latencyMs ? `${latencyMs}ms` : '--'}</span>
+                    <span>Latency: {latencyMs ? `${latencyMs}ms` : '0ms'}</span>
                 </div>
             </div>
         </div>

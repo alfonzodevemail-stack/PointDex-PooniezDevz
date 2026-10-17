@@ -7,8 +7,6 @@ import {
     ArrowLeft,
     Maximize,
     Pause,
-    Sparkles,
-    Trophy,
     RotateCcw
 } from 'lucide-react';
 
@@ -20,43 +18,39 @@ export default function PracticeIndex({ settings = {} }) {
         open_palm: 0,
     });
 
-    const [lastFeedback, setLastFeedback] = useState({
-        gesture: null,
-        message: 'Position your hand in the camera frame to begin practicing.',
-        type: 'info',
-    });
+    const [lastFeedback, setLastFeedback] = useState('Raise your hand in front of the camera to test gestures.');
 
     const gestures = [
         {
             key: 'swipe_right',
             name: 'Swipe Right',
             icon: ArrowRight,
-            action: 'Next Slide (ArrowRight)',
-            instructions: 'Quickly sweep your open hand from left to right.',
+            action: 'Next Slide',
+            instructions: 'Move your open hand from left to right.',
             goal: 5,
         },
         {
             key: 'swipe_left',
             name: 'Swipe Left',
             icon: ArrowLeft,
-            action: 'Previous Slide (ArrowLeft)',
-            instructions: 'Quickly sweep your open hand from right to left.',
+            action: 'Previous Slide',
+            instructions: 'Move your open hand from right to left.',
             goal: 5,
         },
         {
             key: 'fist',
-            name: 'Closed Fist (Hold 1.5s)',
+            name: 'Closed Fist',
             icon: Maximize,
-            action: 'Fullscreen Toggle (F5)',
-            instructions: 'Clench all fingers into a tight fist and hold steady.',
+            action: 'Fullscreen (Hold 1.5s)',
+            instructions: 'Close your hand into a fist and hold still.',
             goal: 3,
         },
         {
             key: 'open_palm',
-            name: 'Open Palm (Stop Sign)',
+            name: 'Open Palm',
             icon: Pause,
-            action: 'Pause / Blank Screen (B)',
-            instructions: 'Hold your open hand flat and still facing the camera.',
+            action: 'Pause Presentation',
+            instructions: 'Hold an open hand facing the camera.',
             goal: 3,
         },
     ];
@@ -67,12 +61,7 @@ export default function PracticeIndex({ settings = {} }) {
                 ...prev,
                 [gesture.type]: prev[gesture.type] + 1,
             }));
-
-            setLastFeedback({
-                gesture: gesture.type,
-                message: `Detected ${gesture.label} (${gesture.key})!`,
-                type: 'success',
-            });
+            setLastFeedback(`Detected: ${gesture.label}`);
         }
     };
 
@@ -83,29 +72,22 @@ export default function PracticeIndex({ settings = {} }) {
             fist: 0,
             open_palm: 0,
         });
-        setLastFeedback({
-            gesture: null,
-            message: 'Scores reset. Ready to practice!',
-            type: 'info',
-        });
+        setLastFeedback('Counters reset.');
     };
-
-    const totalSuccess = Object.values(practiceScores).reduce((a, b) => a + b, 0);
 
     return (
         <PointDexLayout title="Practice Mode">
-            <Head title="Practice Mode & Calibration - PointDex" />
+            <Head title="Practice Mode - PointDex" />
 
             <div className="space-y-6">
-                {/* Header */}
                 <div className="clay-card-sm p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-clay-gold text-clay-charcoal uppercase">
-                            Calibration Studio
-                        </span>
-                        <h1 className="text-xl sm:text-2xl font-black text-clay-charcoal mt-1">
-                            Practice Mode &amp; Sensitivity Calibration
+                        <h1 className="text-xl font-black text-clay-charcoal">
+                            Practice Mode
                         </h1>
+                        <p className="text-xs text-clay-charcoal/75 font-medium mt-0.5">
+                            Test your webcam and hand gestures before starting a presentation.
+                        </p>
                     </div>
 
                     <button
@@ -114,30 +96,20 @@ export default function PracticeIndex({ settings = {} }) {
                         className="clay-btn-light px-4 py-2 text-xs inline-flex items-center space-x-1.5"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Reset Scores</span>
+                        <span>Reset</span>
                     </button>
                 </div>
 
-                {/* Split Layout */}
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-                    {/* Left: Gesture Cards (Cols 1-8) */}
                     <div className="xl:col-span-8 space-y-4">
-                        <div
-                            className={`p-4 rounded-2xl flex items-center space-x-2.5 text-xs font-bold ${
-                                lastFeedback.type === 'success'
-                                    ? 'clay-btn-gold text-clay-charcoal'
-                                    : 'clay-inset text-clay-charcoal'
-                            }`}
-                        >
-                            <Sparkles className="w-4 h-4 flex-shrink-0" />
-                            <span>{lastFeedback.message}</span>
+                        <div className="clay-inset p-4 text-xs font-bold text-clay-charcoal">
+                            {lastFeedback}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {gestures.map((item) => {
                                 const Icon = item.icon;
                                 const count = practiceScores[item.key] || 0;
-                                const isGoalMet = count >= item.goal;
 
                                 return (
                                     <div key={item.key} className="clay-card p-5">
@@ -145,14 +117,8 @@ export default function PracticeIndex({ settings = {} }) {
                                             <div className="w-10 h-10 rounded-xl clay-btn-dark flex items-center justify-center">
                                                 <Icon className="w-5 h-5 text-clay-gold" />
                                             </div>
-                                            <span
-                                                className={`text-xs font-mono font-extrabold px-2.5 py-0.5 rounded-full ${
-                                                    isGoalMet
-                                                        ? 'bg-clay-gold text-clay-charcoal'
-                                                        : 'clay-inset text-clay-charcoal'
-                                                }`}
-                                            >
-                                                {count} / {item.goal} hits
+                                            <span className="text-xs font-mono font-extrabold px-2.5 py-0.5 rounded-full clay-inset text-clay-charcoal">
+                                                {count} / {item.goal}
                                             </span>
                                         </div>
 
@@ -176,30 +142,8 @@ export default function PracticeIndex({ settings = {} }) {
                                 );
                             })}
                         </div>
-
-                        {/* Overall Mastery */}
-                        <div className="clay-card-sm p-5 flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 rounded-2xl clay-btn-gold flex items-center justify-center">
-                                    <Trophy className="w-6 h-6 text-clay-charcoal" />
-                                </div>
-                                <div>
-                                    <h4 className="font-black text-clay-charcoal text-sm">
-                                        Calibration Mastery
-                                    </h4>
-                                    <p className="text-xs text-clay-charcoal/70 font-medium">
-                                        Total validated gestures: {totalSuccess}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <span className="text-2xl font-black text-clay-charcoal font-mono">
-                                {Math.min(100, Math.round((totalSuccess / 16) * 100))}%
-                            </span>
-                        </div>
                     </div>
 
-                    {/* Right: Optical Controller (Cols 9-12) */}
                     <div className="xl:col-span-4">
                         <WebcamControllerPanel
                             settings={settings}
