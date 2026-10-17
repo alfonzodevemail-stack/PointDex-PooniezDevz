@@ -1,3 +1,91 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    /* Main Raised 3D Clay Card (#FCFAF1 surface with #CACACA inner depth) */
+    .clay-card {
+        background-color: #FCFAF1;
+        border-radius: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow:
+            10px 14px 28px rgba(52, 52, 52, 0.10),
+            inset -6px -6px 14px rgba(202, 202, 202, 0.55),
+            inset 6px 6px 14px rgba(255, 255, 255, 0.95);
+    }
+
+    /* Smaller Raised Clay Container (for thumbnails, metric tiles, badges) */
+    .clay-card-sm {
+        background-color: #FCFAF1;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow:
+            6px 8px 16px rgba(52, 52, 52, 0.08),
+            inset -4px -4px 8px rgba(202, 202, 202, 0.5),
+            inset 4px 4px 8px rgba(255, 255, 255, 0.9);
+    }
+
+    /* Recessed / Pressed Clay Well (for slide trays, inputs, and background frames) */
+    .clay-inset {
+        background-color: #F2EFE4;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(202, 202, 202, 0.45);
+        box-shadow:
+            inset 5px 5px 10px rgba(202, 202, 202, 0.65),
+            inset -5px -5px 10px rgba(255, 255, 255, 0.9);
+    }
+
+    /* Puffy 3D Gold Button (#E6B31E) */
+    .clay-btn-gold {
+        background-color: #E6B31E;
+        color: #343434;
+        border-radius: 0.875rem;
+        font-weight: 700;
+        box-shadow:
+            0 8px 16px rgba(230, 179, 30, 0.30),
+            inset -4px -4px 8px rgba(180, 135, 10, 0.45),
+            inset 4px 4px 8px rgba(255, 230, 140, 0.75);
+        transition: all 0.15s ease;
+    }
+    .clay-btn-gold:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.03);
+    }
+    .clay-btn-gold:active {
+        transform: translateY(1px);
+    }
+
+    /* Puffy 3D Charcoal Button / Active Tab (#343434) */
+    .clay-btn-dark {
+        background-color: #343434;
+        color: #FCFAF1;
+        border-radius: 0.875rem;
+        font-weight: 700;
+        box-shadow:
+            0 8px 16px rgba(52, 52, 52, 0.22),
+            inset -4px -4px 8px rgba(20, 20, 20, 0.6),
+            inset 4px 4px 8px rgba(95, 95, 95, 0.45);
+        transition: all 0.15s ease;
+    }
+    .clay-btn-dark:hover {
+        transform: translateY(-1px);
+    }
+
+    /* Puffy 3D Cream Button (Secondary controls) */
+    .clay-btn-light {
+        background-color: #FCFAF1;
+        color: #343434;
+        border-radius: 0.875rem;
+        font-weight: 600;
+        border: 1px solid rgba(202, 202, 202, 0.5);
+        box-shadow:
+            4px 6px 12px rgba(52, 52, 52, 0.08),
+            inset -3px -3px 6px rgba(202, 202, 202, 0.55),
+            inset 3px 3px 6px rgba(255, 255, 255, 0.95);
+        transition: all 0.15s ease;
+    }
+    .clay-btn-light:hover {
+        background-color: #F5F2E6;
+        transform: translateY(-1px);
+    }
+}

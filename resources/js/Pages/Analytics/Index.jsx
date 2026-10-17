@@ -1,34 +1,28 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
-import { 
-    BarChart3, 
-    Zap, 
-    Activity, 
-    CheckCircle2, 
-    AlertTriangle, 
-    ShieldCheck, 
-    Download, 
-    Sun, 
-    Maximize2, 
-    Clock,
+import {
+    Zap,
+    Activity,
+    CheckCircle2,
+    AlertTriangle,
+    ShieldCheck,
+    Sun,
+    Maximize2,
     FileSpreadsheet
 } from 'lucide-react';
 
 export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
     const {
-        totalSessions = 0,
-        totalGestures = 0,
         avgLatency = 44.5,
         avgFps = 29.4,
         accuracyRate = 96.2,
-        gestureDistribution = [],
         targetBenchmarks = {
             latency: '< 80ms',
             fps: '28 - 30 FPS',
             accuracy: '>= 90%',
             false_positive: '< 2%',
-        }
+        },
     } = metrics;
 
     const testCases = [
@@ -43,14 +37,14 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
             id: 'TC-02',
             title: 'Cooldown Double-Trigger Prevention',
             condition: 'Presenter executes two swipes in rapid succession (< 0.5s)',
-            expected: 'First swipe accepted; second swipe locked by cooldown timer preventing double-slide jumps',
+            expected: 'First swipe accepted; second swipe locked by cooldown timer',
             status: 'Passed',
         },
         {
             id: 'TC-03',
             title: 'Camera Disconnection Handling',
             condition: 'Webcam feed disconnected or permission revoked',
-            expected: 'System displays non-blocking warning banner without crashing browser thread',
+            expected: 'System displays non-blocking status badge without freezing thread',
             status: 'Passed',
         },
     ];
@@ -70,17 +64,17 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
 
     const exportCsv = () => {
         const headers = ['Session Code', 'Mode', 'Lighting', 'Distance (m)', 'FPS', 'Latency (ms)', 'Gestures'];
-        const rows = sessions.map(s => [
+        const rows = sessions.map((s) => [
             s.session_code,
             s.mode,
             s.lighting_condition,
             s.distance_meters,
             s.avg_fps,
             s.avg_latency_ms,
-            s.total_gestures_detected
+            s.total_gestures_detected,
         ]);
 
-        const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].map(e => e.join(',')).join('\n');
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].map((e) => e.join(',')).join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
@@ -94,114 +88,116 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
         <PointDexLayout title="Analytics & Benchmarks">
             <Head title="Telemetry Analytics & Benchmarks - PointDex" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+                <div className="clay-card-sm p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <div className="flex items-center space-x-2">
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                                Section 3.4 & 4.2
-                            </span>
-                            <span className="text-xs text-slate-400">Quantitative Telemetry & ISO/IEC 25010 Quality Model</span>
-                        </div>
-                        <h1 className="text-2xl font-black text-white mt-1">Empirical Performance & Usability Telemetry</h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-clay-gold text-clay-charcoal uppercase">
+                            Section 3.4 &amp; 4.2
+                        </span>
+                        <h1 className="text-xl sm:text-2xl font-black text-clay-charcoal mt-1">
+                            Empirical Performance &amp; Usability Telemetry
+                        </h1>
                     </div>
 
                     <button
+                        type="button"
                         onClick={exportCsv}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold shadow transition"
+                        className="clay-btn-dark px-4 py-2.5 text-xs inline-flex items-center space-x-2"
                     >
-                        <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                        <FileSpreadsheet className="w-4 h-4 text-clay-gold" />
                         <span>Export CSV Log</span>
                     </button>
                 </div>
 
-                {/* Scorecard Grid vs Research Benchmarks */}
+                {/* Scorecard Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg">
-                        <div className="flex items-center justify-between text-slate-400">
-                            <span className="text-xs font-semibold">Response Latency</span>
-                            <Zap className="w-4 h-4 text-amber-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70">
+                            <span className="text-xs font-bold">Response Latency</span>
+                            <Zap className="w-4 h-4 text-clay-gold fill-clay-gold" />
                         </div>
-                        <div className="text-3xl font-black text-white font-mono mt-2">
-                            {avgLatency} <span className="text-sm font-normal text-slate-400">ms</span>
+                        <div className="text-3xl font-black text-clay-charcoal font-mono mt-2">
+                            {avgLatency} <span className="text-xs font-bold">ms</span>
                         </div>
-                        <div className="mt-2 text-xs flex items-center justify-between text-slate-400 pt-2 border-t border-slate-800">
-                            <span>Target: {targetBenchmarks.latency}</span>
-                            <span className="text-emerald-400 font-bold">Passed</span>
-                        </div>
-                    </div>
-
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg">
-                        <div className="flex items-center justify-between text-slate-400">
-                            <span className="text-xs font-semibold">Optical Frame Rate</span>
-                            <Activity className="w-4 h-4 text-cyan-400" />
-                        </div>
-                        <div className="text-3xl font-black text-white font-mono mt-2">
-                            {avgFps} <span className="text-sm font-normal text-slate-400">FPS</span>
-                        </div>
-                        <div className="mt-2 text-xs flex items-center justify-between text-slate-400 pt-2 border-t border-slate-800">
-                            <span>Baseline: {targetBenchmarks.fps}</span>
-                            <span className="text-emerald-400 font-bold">Optimal</span>
+                        <div className="mt-2 text-xs flex items-center justify-between pt-2 border-t border-clay-gray/50 font-bold">
+                            <span className="text-clay-charcoal/70">Target: {targetBenchmarks.latency}</span>
+                            <span className="text-emerald-700">Passed</span>
                         </div>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg">
-                        <div className="flex items-center justify-between text-slate-400">
-                            <span className="text-xs font-semibold">Classification Accuracy</span>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70">
+                            <span className="text-xs font-bold">Optical Frame Rate</span>
+                            <Activity className="w-4 h-4 text-clay-charcoal" />
                         </div>
-                        <div className="text-3xl font-black text-white font-mono mt-2">
-                            {accuracyRate} <span className="text-sm font-normal text-slate-400">%</span>
+                        <div className="text-3xl font-black text-clay-charcoal font-mono mt-2">
+                            {avgFps} <span className="text-xs font-bold">FPS</span>
                         </div>
-                        <div className="mt-2 text-xs flex items-center justify-between text-slate-400 pt-2 border-t border-slate-800">
-                            <span>Benchmark: {targetBenchmarks.accuracy}</span>
-                            <span className="text-emerald-400 font-bold">Exceeded</span>
+                        <div className="mt-2 text-xs flex items-center justify-between pt-2 border-t border-clay-gray/50 font-bold">
+                            <span className="text-clay-charcoal/70">Baseline: {targetBenchmarks.fps}</span>
+                            <span className="text-emerald-700">Optimal</span>
                         </div>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg">
-                        <div className="flex items-center justify-between text-slate-400">
-                            <span className="text-xs font-semibold">False Positive Rate</span>
-                            <AlertTriangle className="w-4 h-4 text-indigo-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70">
+                            <span className="text-xs font-bold">Accuracy Rate</span>
+                            <CheckCircle2 className="w-4 h-4 text-clay-charcoal" />
                         </div>
-                        <div className="text-3xl font-black text-white font-mono mt-2">
-                            0.8 <span className="text-sm font-normal text-slate-400">%</span>
+                        <div className="text-3xl font-black text-clay-charcoal font-mono mt-2">
+                            {accuracyRate} <span className="text-xs font-bold">%</span>
                         </div>
-                        <div className="mt-2 text-xs flex items-center justify-between text-slate-400 pt-2 border-t border-slate-800">
-                            <span>Threshold: {targetBenchmarks.false_positive}</span>
-                            <span className="text-emerald-400 font-bold">Passed</span>
+                        <div className="mt-2 text-xs flex items-center justify-between pt-2 border-t border-clay-gray/50 font-bold">
+                            <span className="text-clay-charcoal/70">Benchmark: {targetBenchmarks.accuracy}</span>
+                            <span className="text-emerald-700">Exceeded</span>
+                        </div>
+                    </div>
+
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70">
+                            <span className="text-xs font-bold">False Positives</span>
+                            <AlertTriangle className="w-4 h-4 text-clay-gold" />
+                        </div>
+                        <div className="text-3xl font-black text-clay-charcoal font-mono mt-2">
+                            0.8 <span className="text-xs font-bold">%</span>
+                        </div>
+                        <div className="mt-2 text-xs flex items-center justify-between pt-2 border-t border-clay-gray/50 font-bold">
+                            <span className="text-clay-charcoal/70">Threshold: {targetBenchmarks.false_positive}</span>
+                            <span className="text-emerald-700">Passed</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Black-Box Test Cases (Section 4.2 table) */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                {/* Black-Box Test Matrix */}
+                <div className="clay-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-white">Black-Box Verification Test Matrix</h2>
-                        <span className="text-xs text-slate-400">Section 4.2 Requirements</span>
+                        <h2 className="text-base font-black text-clay-charcoal">
+                            Black-Box Verification Test Matrix
+                        </h2>
+                        <span className="text-xs font-bold text-clay-charcoal/60">Section 4.2</span>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left text-slate-300">
-                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                    <div className="overflow-x-auto clay-inset p-3">
+                        <table className="w-full text-xs text-left text-clay-charcoal">
+                            <thead className="uppercase font-extrabold border-b border-clay-gray">
                                 <tr>
-                                    <th className="px-4 py-3">Case ID</th>
-                                    <th className="px-4 py-3">Test Scenario</th>
-                                    <th className="px-4 py-3">Condition / Action</th>
-                                    <th className="px-4 py-3">Expected Outcome</th>
-                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-3 py-2.5">Case ID</th>
+                                    <th className="px-3 py-2.5">Test Scenario</th>
+                                    <th className="px-3 py-2.5">Condition / Action</th>
+                                    <th className="px-3 py-2.5">Expected Outcome</th>
+                                    <th className="px-3 py-2.5">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800">
+                            <tbody className="divide-y divide-clay-gray/50 font-medium">
                                 {testCases.map((tc) => (
-                                    <tr key={tc.id} className="hover:bg-slate-800/40">
-                                        <td className="px-4 py-3 font-mono font-bold text-indigo-400">{tc.id}</td>
-                                        <td className="px-4 py-3 font-semibold text-white">{tc.title}</td>
-                                        <td className="px-4 py-3 text-slate-300">{tc.condition}</td>
-                                        <td className="px-4 py-3 text-slate-400">{tc.expected}</td>
-                                        <td className="px-4 py-3">
-                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
+                                    <tr key={tc.id}>
+                                        <td className="px-3 py-3 font-mono font-black">{tc.id}</td>
+                                        <td className="px-3 py-3 font-bold">{tc.title}</td>
+                                        <td className="px-3 py-3">{tc.condition}</td>
+                                        <td className="px-3 py-3 text-clay-charcoal/80">{tc.expected}</td>
+                                        <td className="px-3 py-3">
+                                            <span className="px-2.5 py-0.5 rounded-full bg-clay-gold text-clay-charcoal font-extrabold">
                                                 {tc.status}
                                             </span>
                                         </td>
@@ -212,76 +208,46 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
                     </div>
                 </div>
 
-                {/* Environmental Variance & Distance Calibration (Section 3.5) */}
+                {/* Illuminance & Distance Calibration */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Environmental Illuminance Tiers */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                        <div className="flex items-center space-x-2 text-white font-bold text-base">
-                            <Sun className="w-4 h-4 text-amber-400" />
+                    <div className="clay-card p-6 space-y-3">
+                        <div className="flex items-center space-x-2 text-clay-charcoal font-black text-base">
+                            <Sun className="w-4 h-4 text-clay-gold" />
                             <h3>Environmental Illuminance Testing</h3>
                         </div>
-                        <p className="text-xs text-slate-400">
-                            Quantifying gesture accuracy across three standardized illuminance tiers (Section 3.5).
-                        </p>
-
-                        <div className="space-y-3 pt-2">
+                        <div className="space-y-2.5 pt-1">
                             {environmentalTiers.map((env, idx) => (
-                                <div key={idx} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                                    <span className="font-semibold text-slate-200">{env.tier}</span>
-                                    <div className="flex items-center space-x-4 font-mono">
-                                        <span className="text-emerald-400 font-bold">{env.accuracy}</span>
-                                        <span className="text-slate-400">{env.latency}</span>
-                                        <span className="text-cyan-400">{env.fps} FPS</span>
+                                <div
+                                    key={idx}
+                                    className="clay-inset p-3.5 flex items-center justify-between text-xs font-bold"
+                                >
+                                    <span>{env.tier}</span>
+                                    <div className="flex items-center space-x-3 font-mono">
+                                        <span className="bg-clay-gold px-2 py-0.5 rounded">{env.accuracy}</span>
+                                        <span>{env.latency}</span>
+                                        <span>{env.fps} FPS</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Distance Calibration */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                        <div className="flex items-center space-x-2 text-white font-bold text-base">
-                            <Maximize2 className="w-4 h-4 text-indigo-400" />
-                            <h3>Distance & Anthropometric Testing</h3>
+                    <div className="clay-card p-6 space-y-3">
+                        <div className="flex items-center space-x-2 text-clay-charcoal font-black text-base">
+                            <Maximize2 className="w-4 h-4 text-clay-charcoal" />
+                            <h3>Distance &amp; Anthropometric Calibration</h3>
                         </div>
-                        <p className="text-xs text-slate-400">
-                            Optical tracking accuracy calibrated across physical distances from 1.0m to 3.5m.
-                        </p>
-
-                        <div className="space-y-3 pt-2">
+                        <div className="space-y-2.5 pt-1">
                             {distanceCalibration.map((dist, idx) => (
-                                <div key={idx} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-                                    <span className="font-mono font-bold text-indigo-300">{dist.distance}</span>
-                                    <span className="text-slate-300">{dist.reliability}</span>
-                                    <span className="font-mono text-emerald-400 font-bold">{dist.accuracy}</span>
+                                <div
+                                    key={idx}
+                                    className="clay-inset p-3.5 flex items-center justify-between text-xs font-bold"
+                                >
+                                    <span className="font-mono">{dist.distance}</span>
+                                    <span className="text-clay-charcoal/75">{dist.reliability}</span>
+                                    <span className="font-mono bg-clay-gold px-2 py-0.5 rounded">{dist.accuracy}</span>
                                 </div>
                             ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ISO/IEC 25010 Software Quality Compliance */}
-                <div className="p-6 rounded-2xl bg-indigo-950/30 border border-indigo-800/40 space-y-3">
-                    <div className="flex items-center space-x-2 text-indigo-300 font-bold text-sm">
-                        <ShieldCheck className="w-5 h-5 text-indigo-400" />
-                        <span>ISO/IEC 25010 Quality Model Assessment</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs text-slate-300 pt-2">
-                        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-                            <h4 className="font-bold text-white mb-1">Functional Suitability</h4>
-                            <p className="text-slate-400">Correct gesture-to-command translation with &gt; 95% accuracy.</p>
-                        </div>
-                        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-                            <h4 className="font-bold text-white mb-1">Performance Efficiency</h4>
-                            <p className="text-slate-400">Sub-80ms response time and ~30 FPS on integrated laptop GPUs.</p>
-                        </div>
-                        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-                            <h4 className="font-bold text-white mb-1">Usability (SUS)</h4>
-                            <p className="text-slate-400">Target composite score &gt; 75.0 on 10-item Likert-scale.</p>
-                        </div>
-                        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-                            <h4 className="font-bold text-white mb-1">Reliability</h4>
-                            <p className="text-slate-400">Graceful camera disconnect handling and software debounce cooldown.</p>
                         </div>
                     </div>
                 </div>

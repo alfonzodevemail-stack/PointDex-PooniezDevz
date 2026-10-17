@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
 import WebcamControllerPanel from '@/Components/WebcamControllerPanel';
-import { 
-    Hand, 
-    CheckCircle2, 
-    ArrowRight, 
-    ArrowLeft, 
-    Maximize, 
-    Pause, 
+import {
+    ArrowRight,
+    ArrowLeft,
+    Maximize,
+    Pause,
     Sparkles,
     Trophy,
     RotateCcw
@@ -25,7 +23,7 @@ export default function PracticeIndex({ settings = {} }) {
     const [lastFeedback, setLastFeedback] = useState({
         gesture: null,
         message: 'Position your hand in the camera frame to begin practicing.',
-        type: 'info'
+        type: 'info',
     });
 
     const gestures = [
@@ -33,8 +31,6 @@ export default function PracticeIndex({ settings = {} }) {
             key: 'swipe_right',
             name: 'Swipe Right',
             icon: ArrowRight,
-            color: 'text-indigo-400',
-            bg: 'bg-indigo-500/10 border-indigo-500/20',
             action: 'Next Slide (ArrowRight)',
             instructions: 'Quickly sweep your open hand from left to right.',
             goal: 5,
@@ -43,8 +39,6 @@ export default function PracticeIndex({ settings = {} }) {
             key: 'swipe_left',
             name: 'Swipe Left',
             icon: ArrowLeft,
-            color: 'text-cyan-400',
-            bg: 'bg-cyan-500/10 border-cyan-500/20',
             action: 'Previous Slide (ArrowLeft)',
             instructions: 'Quickly sweep your open hand from right to left.',
             goal: 5,
@@ -53,8 +47,6 @@ export default function PracticeIndex({ settings = {} }) {
             key: 'fist',
             name: 'Closed Fist (Hold 1.5s)',
             icon: Maximize,
-            color: 'text-amber-400',
-            bg: 'bg-amber-500/10 border-amber-500/20',
             action: 'Fullscreen Toggle (F5)',
             instructions: 'Clench all fingers into a tight fist and hold steady.',
             goal: 3,
@@ -63,8 +55,6 @@ export default function PracticeIndex({ settings = {} }) {
             key: 'open_palm',
             name: 'Open Palm (Stop Sign)',
             icon: Pause,
-            color: 'text-emerald-400',
-            bg: 'bg-emerald-500/10 border-emerald-500/20',
             action: 'Pause / Blank Screen (B)',
             instructions: 'Hold your open hand flat and still facing the camera.',
             goal: 3,
@@ -72,16 +62,16 @@ export default function PracticeIndex({ settings = {} }) {
     ];
 
     const handleGestureDetected = (gesture) => {
-        if (practiceScores.hasOwnProperty(gesture.type)) {
-            setPracticeScores(prev => ({
+        if (Object.prototype.hasOwnProperty.call(practiceScores, gesture.type)) {
+            setPracticeScores((prev) => ({
                 ...prev,
-                [gesture.type]: prev[gesture.type] + 1
+                [gesture.type]: prev[gesture.type] + 1,
             }));
 
             setLastFeedback({
                 gesture: gesture.type,
-                message: `Excellent! Detected ${gesture.label} with ${gesture.latencyMs || 45}ms latency.`,
-                type: 'success'
+                message: `Detected ${gesture.label} (${gesture.key})!`,
+                type: 'success',
             });
         }
     };
@@ -96,7 +86,7 @@ export default function PracticeIndex({ settings = {} }) {
         setLastFeedback({
             gesture: null,
             message: 'Scores reset. Ready to practice!',
-            type: 'info'
+            type: 'info',
         });
     };
 
@@ -106,45 +96,43 @@ export default function PracticeIndex({ settings = {} }) {
         <PointDexLayout title="Practice Mode">
             <Head title="Practice Mode & Calibration - PointDex" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+            <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+                <div className="clay-card-sm p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <div className="flex items-center space-x-2">
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                Calibration Room
-                            </span>
-                            <span className="text-xs text-slate-400">Phase 2: Nonconventional Optical Input</span>
-                        </div>
-                        <h1 className="text-2xl font-black text-white mt-1">Gesture Training & Sensitivity Calibration</h1>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-clay-gold text-clay-charcoal uppercase">
+                            Calibration Studio
+                        </span>
+                        <h1 className="text-xl sm:text-2xl font-black text-clay-charcoal mt-1">
+                            Practice Mode &amp; Sensitivity Calibration
+                        </h1>
                     </div>
 
                     <button
+                        type="button"
                         onClick={resetScores}
-                        className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition"
+                        className="clay-btn-light px-4 py-2 text-xs inline-flex items-center space-x-1.5"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Reset Practice Scores</span>
+                        <span>Reset Scores</span>
                     </button>
                 </div>
 
-                {/* Main Split Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    {/* Left: Gesture Tutorials & Scorecards (Cols 1-7) */}
-                    <div className="lg:col-span-7 space-y-4">
-                        {/* Live Feedback Banner */}
-                        <div className={`p-4 rounded-2xl border transition-all ${
-                            lastFeedback.type === 'success' 
-                                ? 'bg-indigo-950/50 border-indigo-500/40 text-indigo-200' 
-                                : 'bg-slate-900 border-slate-800 text-slate-300'
-                        }`}>
-                            <div className="flex items-center space-x-2">
-                                <Sparkles className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-                                <span className="font-semibold text-sm">{lastFeedback.message}</span>
-                            </div>
+                {/* Split Layout */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    {/* Left: Gesture Cards (Cols 1-8) */}
+                    <div className="xl:col-span-8 space-y-4">
+                        <div
+                            className={`p-4 rounded-2xl flex items-center space-x-2.5 text-xs font-bold ${
+                                lastFeedback.type === 'success'
+                                    ? 'clay-btn-gold text-clay-charcoal'
+                                    : 'clay-inset text-clay-charcoal'
+                            }`}
+                        >
+                            <Sparkles className="w-4 h-4 flex-shrink-0" />
+                            <span>{lastFeedback.message}</span>
                         </div>
 
-                        {/* Gesture Goal Cards */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {gestures.map((item) => {
                                 const Icon = item.icon;
@@ -152,33 +140,35 @@ export default function PracticeIndex({ settings = {} }) {
                                 const isGoalMet = count >= item.goal;
 
                                 return (
-                                    <div
-                                        key={item.key}
-                                        className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
-                                            isGoalMet ? 'bg-slate-900/90 border-emerald-500/40' : 'bg-slate-900/90 border-slate-800'
-                                        }`}
-                                    >
+                                    <div key={item.key} className="clay-card p-5">
                                         <div className="flex items-center justify-between">
-                                            <div className={`p-2 rounded-xl ${item.bg}`}>
-                                                <Icon className={`w-5 h-5 ${item.color}`} />
+                                            <div className="w-10 h-10 rounded-xl clay-btn-dark flex items-center justify-center">
+                                                <Icon className="w-5 h-5 text-clay-gold" />
                                             </div>
-                                            <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
-                                                isGoalMet ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
-                                            }`}>
+                                            <span
+                                                className={`text-xs font-mono font-extrabold px-2.5 py-0.5 rounded-full ${
+                                                    isGoalMet
+                                                        ? 'bg-clay-gold text-clay-charcoal'
+                                                        : 'clay-inset text-clay-charcoal'
+                                                }`}
+                                            >
                                                 {count} / {item.goal} hits
                                             </span>
                                         </div>
 
-                                        <h3 className="font-bold text-white text-base mt-3">{item.name}</h3>
-                                        <p className="text-xs text-indigo-300 font-medium mt-0.5">{item.action}</p>
-                                        <p className="text-xs text-slate-400 mt-2">{item.instructions}</p>
+                                        <h3 className="font-black text-clay-charcoal text-base mt-3">
+                                            {item.name}
+                                        </h3>
+                                        <p className="text-xs font-bold text-clay-charcoal/70 mt-0.5">
+                                            {item.action}
+                                        </p>
+                                        <p className="text-xs text-clay-charcoal/75 mt-2 font-medium">
+                                            {item.instructions}
+                                        </p>
 
-                                        {/* Progress bar */}
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-4">
+                                        <div className="w-full clay-inset h-2 rounded-full overflow-hidden mt-4">
                                             <div
-                                                className={`h-full transition-all duration-300 ${
-                                                    isGoalMet ? 'bg-emerald-400' : 'bg-indigo-500'
-                                                }`}
+                                                className="h-full bg-clay-gold transition-all duration-300"
                                                 style={{ width: `${Math.min(100, (count / item.goal) * 100)}%` }}
                                             />
                                         </div>
@@ -187,26 +177,30 @@ export default function PracticeIndex({ settings = {} }) {
                             })}
                         </div>
 
-                        {/* Overall Practice Progress */}
-                        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                        {/* Overall Mastery */}
+                        <div className="clay-card-sm p-5 flex items-center justify-between">
                             <div className="flex items-center space-x-3">
-                                <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400">
-                                    <Trophy className="w-6 h-6" />
+                                <div className="w-12 h-12 rounded-2xl clay-btn-gold flex items-center justify-center">
+                                    <Trophy className="w-6 h-6 text-clay-charcoal" />
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-white text-sm">Calibration Mastery</h4>
-                                    <p className="text-xs text-slate-400">Total validated optical gestures: {totalSuccess}</p>
+                                    <h4 className="font-black text-clay-charcoal text-sm">
+                                        Calibration Mastery
+                                    </h4>
+                                    <p className="text-xs text-clay-charcoal/70 font-medium">
+                                        Total validated gestures: {totalSuccess}
+                                    </p>
                                 </div>
                             </div>
 
-                            <span className="text-2xl font-black text-amber-400 font-mono">
+                            <span className="text-2xl font-black text-clay-charcoal font-mono">
                                 {Math.min(100, Math.round((totalSuccess / 16) * 100))}%
                             </span>
                         </div>
                     </div>
 
-                    {/* Right: Optical Controller Panel (Cols 8-12) */}
-                    <div className="lg:col-span-5">
+                    {/* Right: Optical Controller (Cols 9-12) */}
+                    <div className="xl:col-span-4">
                         <WebcamControllerPanel
                             settings={settings}
                             onGesture={handleGestureDetected}

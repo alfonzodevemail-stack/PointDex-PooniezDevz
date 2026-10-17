@@ -1,23 +1,19 @@
 import React from 'react';
 import { Head, Link } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
-import { 
-    Play, 
-    Sparkles, 
-    Hand, 
-    Zap, 
-    Activity, 
-    BarChart3, 
-    Presentation, 
-    Clock, 
-    ShieldCheck, 
-    Plus,
+import {
+    Play,
+    Sparkles,
+    Hand,
+    Zap,
+    Activity,
+    Presentation,
+    ShieldCheck,
     Users,
-    Layers,
     ChevronRight
 } from 'lucide-react';
 
-export default function Dashboard({ presentations = [], recentSessions = [], stats = {} }) {
+export default function Dashboard({ presentations = [], stats = {} }) {
     const defaultStats = {
         totalPresentations: presentations.length,
         totalSessions: stats.totalSessions || 0,
@@ -29,102 +25,107 @@ export default function Dashboard({ presentations = [], recentSessions = [], sta
         <PointDexLayout title="PointDex - Dashboard">
             <Head title="PointDex - Gesture-Based Remote Presentation Controller" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-                {/* Hero Showcase Banner */}
-                <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-800/40 p-8 sm:p-12 shadow-2xl">
-                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                    
+            <div className="space-y-6">
+                {/* Hero Clay Banner */}
+                <div className="clay-card p-6 sm:p-10 relative overflow-hidden">
+                    <div className="pointer-events-none absolute -top-12 -right-12 w-56 h-56 rotate-45 bg-clay-gold/25 rounded-3xl" />
+
                     <div className="relative z-10 max-w-3xl space-y-4">
-                        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold">
-                            <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                            <span>Event-Driven Architecture (EDA) & Machine Learning</span>
+                        <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-clay-charcoal text-clay-cream text-xs font-bold">
+                            <Sparkles className="w-3.5 h-3.5 text-clay-gold" />
+                            <span>Event-Driven Architecture (EDA) & MediaPipe WASM</span>
                         </div>
 
-                        <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                            Control Presentations with <span className="bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">Natural Hand Gestures</span>.
+                        <h1 className="text-2xl sm:text-4xl font-black text-clay-charcoal tracking-tight leading-tight">
+                            Control Presentations with{' '}
+                            <span className="underline decoration-clay-gold decoration-4 underline-offset-4">
+                                Natural Hand Gestures
+                            </span>.
                         </h1>
 
-                        <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                            PointDex eliminates physical clickers by converting standard laptop webcam feeds into a non-blocking optical event producer. Powered by client-side MediaPipe WASM and a real-time event bus.
+                        <p className="text-clay-charcoal/80 text-xs sm:text-sm leading-relaxed font-medium">
+                            PointDex eliminates physical clickers by converting standard laptop webcam feeds into a non-blocking optical event producer.
                         </p>
 
                         <div className="flex flex-wrap items-center gap-3 pt-2">
                             <Link
                                 href="/presentations/1"
-                                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition transform hover:-translate-y-0.5"
+                                className="clay-btn-gold px-6 py-3 text-xs sm:text-sm inline-flex items-center space-x-2"
                             >
-                                <Play className="w-4 h-4 fill-white" />
+                                <Play className="w-4 h-4 fill-clay-charcoal" />
                                 <span>Launch Task Tamer Demo</span>
                             </Link>
 
                             <Link
                                 href="/practice"
-                                className="inline-flex items-center space-x-2 px-5 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-sm transition"
+                                className="clay-btn-dark px-5 py-3 text-xs sm:text-sm inline-flex items-center space-x-2"
                             >
-                                <Hand className="w-4 h-4 text-indigo-400" />
+                                <Hand className="w-4 h-4 text-clay-gold" />
                                 <span>Practice Gestures</span>
                             </Link>
                         </div>
                     </div>
                 </div>
 
-                {/* Key Research Telemetry Metrics (Section 3.4 spec) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                        <div className="flex items-center justify-between text-slate-400 mb-2">
-                            <span className="text-xs font-medium">Avg Latency</span>
-                            <Zap className="w-4 h-4 text-amber-400" />
+                {/* Key Research Telemetry Metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70 mb-1">
+                            <span className="text-xs font-bold">Avg Latency</span>
+                            <Zap className="w-4 h-4 text-clay-gold fill-clay-gold" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-white font-mono">
-                            {defaultStats.avgLatency}<span className="text-sm font-normal text-slate-400 ml-1">ms</span>
+                        <div className="text-2xl sm:text-3xl font-black text-clay-charcoal font-mono">
+                            {defaultStats.avgLatency}
+                            <span className="text-xs font-bold text-clay-charcoal/60 ml-1">ms</span>
                         </div>
-                        <span className="text-[11px] text-emerald-400 font-medium">Target &lt; 80ms (Passed)</span>
+                        <span className="text-[11px] font-bold text-emerald-700">Target &lt; 80ms (Passed)</span>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                        <div className="flex items-center justify-between text-slate-400 mb-2">
-                            <span className="text-xs font-medium">Vision Throughput</span>
-                            <Activity className="w-4 h-4 text-cyan-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70 mb-1">
+                            <span className="text-xs font-bold">Vision Throughput</span>
+                            <Activity className="w-4 h-4 text-clay-charcoal" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-white font-mono">
-                            {defaultStats.avgFps}<span className="text-sm font-normal text-slate-400 ml-1">FPS</span>
+                        <div className="text-2xl sm:text-3xl font-black text-clay-charcoal font-mono">
+                            {defaultStats.avgFps}
+                            <span className="text-xs font-bold text-clay-charcoal/60 ml-1">FPS</span>
                         </div>
-                        <span className="text-[11px] text-emerald-400 font-medium">Baseline 28-30 FPS</span>
+                        <span className="text-[11px] font-bold text-emerald-700">Baseline 28–30 FPS</span>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                        <div className="flex items-center justify-between text-slate-400 mb-2">
-                            <span className="text-xs font-medium">Recognition Accuracy</span>
-                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70 mb-1">
+                            <span className="text-xs font-bold">Accuracy Rate</span>
+                            <ShieldCheck className="w-4 h-4 text-clay-charcoal" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-white font-mono">
-                            96.5<span className="text-sm font-normal text-slate-400 ml-1">%</span>
+                        <div className="text-2xl sm:text-3xl font-black text-clay-charcoal font-mono">
+                            96.5<span className="text-xs font-bold text-clay-charcoal/60 ml-1">%</span>
                         </div>
-                        <span className="text-[11px] text-emerald-400 font-medium">Benchmark &gt;= 90%</span>
+                        <span className="text-[11px] font-bold text-emerald-700">Benchmark &ge; 90%</span>
                     </div>
 
-                    <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                        <div className="flex items-center justify-between text-slate-400 mb-2">
-                            <span className="text-xs font-medium">Data Privacy</span>
-                            <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                    <div className="clay-card-sm p-5">
+                        <div className="flex items-center justify-between text-clay-charcoal/70 mb-1">
+                            <span className="text-xs font-bold">Data Privacy</span>
+                            <ShieldCheck className="w-4 h-4 text-clay-gold" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-white">
+                        <div className="text-2xl sm:text-3xl font-black text-clay-charcoal">
                             100%
                         </div>
-                        <span className="text-[11px] text-slate-400">RA 10173 Client-Side Only</span>
+                        <span className="text-[11px] font-bold text-clay-charcoal/70">RA 10173 Client-Side</span>
                     </div>
                 </div>
 
                 {/* Presentations Section */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <Presentation className="w-5 h-5 text-indigo-400" />
-                            <h2 className="text-xl font-bold text-white">Presentations</h2>
+                            <Presentation className="w-5 h-5 text-clay-charcoal" />
+                            <h2 className="text-lg font-black text-clay-charcoal">Presentation Decks</h2>
                         </div>
                         <Link
                             href="/presentations"
-                            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1"
+                            className="text-xs font-bold text-clay-charcoal hover:underline flex items-center space-x-1"
                         >
                             <span>View All ({presentations.length})</span>
                             <ChevronRight className="w-4 h-4" />
@@ -135,39 +136,37 @@ export default function Dashboard({ presentations = [], recentSessions = [], sta
                         {presentations.map((item) => (
                             <div
                                 key={item.id}
-                                className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-5 shadow-lg flex flex-col justify-between transition-all group"
+                                className="clay-card p-5 flex flex-col justify-between"
                             >
-                                <div className="space-y-3">
+                                <div className="space-y-2.5">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 uppercase font-semibold">
+                                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-clay-gold text-clay-charcoal uppercase">
                                             {item.is_sample ? 'Demo Showcase' : 'Deck'}
                                         </span>
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs font-mono font-bold text-clay-charcoal/70">
                                             {item.slides_data?.length || 1} slides
                                         </span>
                                     </div>
 
-                                    <div>
-                                        <h3 className="font-bold text-white text-lg group-hover:text-indigo-300 transition">
-                                            {item.title}
-                                        </h3>
-                                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                                            {item.description || 'Interactive slide deck ready for gesture navigation.'}
-                                        </p>
-                                    </div>
+                                    <h3 className="font-black text-clay-charcoal text-lg">
+                                        {item.title}
+                                    </h3>
+                                    <p className="text-xs text-clay-charcoal/75 line-clamp-2 font-medium">
+                                        {item.description || 'Interactive slide deck ready for gesture navigation.'}
+                                    </p>
                                 </div>
 
-                                <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                                <div className="mt-5 pt-3 border-t border-clay-gray/50 flex items-center justify-between">
                                     <Link
                                         href={`/presentations/${item.id}`}
-                                        className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition"
+                                        className="clay-btn-dark px-4 py-2 text-xs inline-flex items-center space-x-1.5"
                                     >
-                                        <Play className="w-3 h-3 fill-white" />
+                                        <Play className="w-3 h-3 fill-clay-gold text-clay-gold" />
                                         <span>Present</span>
                                     </Link>
 
-                                    <span className="text-[11px] text-slate-500 font-mono">
-                                        16:9 HD
+                                    <span className="text-[11px] font-mono font-bold text-clay-charcoal/60">
+                                        {item.aspect_ratio || '16:9'}
                                     </span>
                                 </div>
                             </div>
@@ -176,25 +175,25 @@ export default function Dashboard({ presentations = [], recentSessions = [], sta
                 </div>
 
                 {/* Team & Research Attribution Card */}
-                <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="clay-inset p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="space-y-1">
-                        <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xs">
-                            <Users className="w-4 h-4" />
-                            <span>Research Project Contributors</span>
+                        <div className="flex items-center space-x-2 text-clay-charcoal font-black text-xs uppercase tracking-wider">
+                            <Users className="w-4 h-4 text-clay-charcoal" />
+                            <span>PointDex Research Team</span>
                         </div>
-                        <p className="text-sm text-slate-300 font-medium">
+                        <p className="text-xs sm:text-sm text-clay-charcoal font-bold">
                             Khobe Clayne Lolong • I-Chieh Hung • Alfonzo Balagapo • Xer Ruie Morales
                         </p>
-                        <p className="text-xs text-slate-500">
-                            José Rizal University • Track B: Software Engineering Methodology • SDG 9 & 12
+                        <p className="text-[11px] text-clay-charcoal/70 font-medium">
+                            José Rizal University • Track B: Software Engineering Methodology • SDG 9 &amp; 12
                         </p>
                     </div>
 
                     <Link
                         href="/analytics"
-                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                        className="clay-btn-light px-4 py-2 text-xs"
                     >
-                        View Usability & Benchmarking Data
+                        View Benchmarks
                     </Link>
                 </div>
             </div>
