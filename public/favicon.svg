@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+    <!-- Charcoal Clay Circle with Gold Ring -->
+    <circle cx="32" cy="32" r="29" fill="#343434" stroke="#E6B31E" stroke-width="4"/>
+    <!-- Gesture Tracking Pulse Arc -->
+    <path d="M20 22C24 16 40 16 44 22" stroke="#FCFAF1" stroke-width="3" stroke-linecap="round"/>
+    <!-- Gold Hand / Pointer Emblem -->
+    <path d="M29 24V40M35 22V40M23 28V38C23 43 27 47 32 47C37 47 41 43 41 38V26" stroke="#E6B31E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="32" cy="14" r="3" fill="#E6B31E"/>
+</svg>

@@ -108,10 +108,10 @@ class TelemetryController extends Controller
 
         $totalSessions = TelemetrySession::count();
         $totalGestures = GestureLog::count();
-        $avgLatency = round(GestureLog::avg('latency_ms') ?: 48.2, 1);
-        $avgFps = round(TelemetrySession::avg('avg_fps') ?: 29.4, 1);
+        $avgLatency = round(GestureLog::avg('latency_ms') ?: 0, 1);
+        $avgFps = round(TelemetrySession::avg('avg_fps') ?: 0, 1);
         $successfulGestures = GestureLog::where('is_successful', true)->count();
-        $accuracyRate = $totalGestures > 0 ? round(($successfulGestures / $totalGestures) * 100, 1) : 96.5;
+        $accuracyRate = $totalGestures > 0 ? round(($successfulGestures / $totalGestures) * 100, 1) : 0;
 
         // Group by gesture type
         $gestureCounts = GestureLog::selectRaw('gesture_type, count(*) as count, avg(latency_ms) as avg_latency')
