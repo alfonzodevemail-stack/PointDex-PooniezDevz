@@ -17,14 +17,26 @@ class PointDexTest extends TestCase
         $this->seed();
     }
 
+    protected function signIn(): void
+    {
+        $this->actingAs(User::first());
+    }
+
+    public function test_guests_are_redirected_to_login(): void
+    {
+        $this->get('/dashboard')->assertRedirect('/login');
+    }
+
     public function test_dashboard_can_be_rendered(): void
     {
+        $this->signIn();
         $response = $this->get('/dashboard');
         $response->assertStatus(200);
     }
 
     public function test_presentations_index_can_be_rendered(): void
     {
+        $this->signIn();
         $response = $this->get('/presentations');
         $response->assertStatus(200);
     }
@@ -32,18 +44,21 @@ class PointDexTest extends TestCase
     public function test_sample_presentation_can_be_viewed(): void
     {
         $presentation = Presentation::first();
+        $this->signIn();
         $response = $this->get("/presentations/{$presentation->id}");
         $response->assertStatus(200);
     }
 
     public function test_practice_mode_can_be_rendered(): void
     {
+        $this->signIn();
         $response = $this->get('/practice');
         $response->assertStatus(200);
     }
 
     public function test_analytics_page_can_be_rendered(): void
     {
+        $this->signIn();
         $response = $this->get('/analytics');
         $response->assertStatus(200);
     }

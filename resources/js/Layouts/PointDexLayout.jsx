@@ -5,11 +5,14 @@ import {
     Hand,
     BarChart3,
     LayoutDashboard,
-    HelpCircle
+    HelpCircle,
+    UserCircle,
+    LogOut
 } from 'lucide-react';
 
 export default function PointDexLayout({ children }) {
-    const { url } = usePage();
+    const { url, props } = usePage();
+    const user = props.auth?.user;
     const [showTutorial, setShowTutorial] = useState(false);
 
     const isPracticeMode = url.startsWith('/practice');
@@ -94,10 +97,39 @@ export default function PointDexLayout({ children }) {
                             </nav>
                         </div>
 
-                        <div className="pt-4 border-t border-clay-gray/50 text-center">
-                            <span className="text-[11px] font-semibold text-clay-charcoal/60">
-                                PointDex Presenter
-                            </span>
+                        <div className="pt-4 border-t border-clay-gray/50 space-y-1">
+                            {user && (
+                                <>
+                                    <Link
+                                        href="/profile"
+                                        className={`flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                                            url.startsWith('/profile')
+                                                ? 'clay-btn-dark text-clay-cream'
+                                                : 'text-clay-charcoal/80 hover:bg-clay-gray/30 hover:text-clay-charcoal'
+                                        }`}
+                                    >
+                                        <UserCircle className="w-4 h-4 flex-shrink-0" />
+                                        <span className="min-w-0">
+                                            <span className="block truncate">{user.name}</span>
+                                            <span className="block text-[10px] font-semibold opacity-70">Profile &amp; Security</span>
+                                        </span>
+                                    </Link>
+                                    <Link
+                                        href="/logout"
+                                        method="post"
+                                        as="button"
+                                        className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl text-xs font-bold text-clay-charcoal/80 hover:bg-clay-gray/30 hover:text-clay-charcoal transition-all text-left"
+                                    >
+                                        <LogOut className="w-4 h-4 text-clay-charcoal/70" />
+                                        <span>Log Out</span>
+                                    </Link>
+                                </>
+                            )}
+                            <div className="text-center pt-1">
+                                <span className="text-[11px] font-semibold text-clay-charcoal/60">
+                                    PointDex Presenter
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </aside>
@@ -148,7 +180,7 @@ export default function PointDexLayout({ children }) {
                             <div className="clay-inset p-4">
                                 <h4 className="font-extrabold text-clay-charcoal text-sm">Open Palm</h4>
                                 <p className="text-xs text-clay-charcoal/75 mt-1">
-                                    Hold an open palm facing the camera to pause the presentation.
+                                    Hold an open palm still, facing the camera, for about a second to pause or resume.
                                 </p>
                             </div>
                         </div>

@@ -89,3 +89,27 @@
         transform: translateY(-1px);
     }
 }
+
+/* Login / sign-up showcase animations */
+@keyframes pdx-swipe {
+    0%, 55% { transform: translateX(0) rotate(8deg); opacity: 0; }
+    62% { opacity: 1; }
+    92% { transform: translateX(-14rem) rotate(-10deg); opacity: 1; }
+    100% { transform: translateX(-16rem) rotate(-12deg); opacity: 0; }
+}
+
+@keyframes pdx-slide-in {
+    from { transform: translateX(28px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pdx-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-18px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pdx-anim {
+        animation: none !important;
+    }
+}

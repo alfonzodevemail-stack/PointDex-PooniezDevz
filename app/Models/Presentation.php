@@ -14,12 +14,24 @@ class Presentation extends Model
         'slides_data',
         'presentation_url',
         'is_sample',
+        'source_type',
+        'file_path',
+        'original_filename',
+    ];
+
+    protected $hidden = [
+        'file_path',
     ];
 
     protected $casts = [
         'slides_data' => 'array',
         'is_sample' => 'boolean',
     ];
+
+    public function isViewableBy(?User $user): bool
+    {
+        return $this->is_sample || ($user && $this->user_id === $user->id);
+    }
 
     public function user()
     {

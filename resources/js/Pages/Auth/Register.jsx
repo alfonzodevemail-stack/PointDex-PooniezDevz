@@ -1,9 +1,18 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
+import AuthInput from '@/Components/AuthInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowRight, Lock, Mail, User } from 'lucide-react';
+
+const STRENGTH_LABELS = ['Too short', 'Weak', 'Okay', 'Good', 'Strong'];
+
+function passwordStrength(password) {
+    if (password.length < 8) return 0;
+    let score = 1;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password) || password.length >= 14) score++;
+    return score;
+}
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -21,100 +30,111 @@ export default function Register() {
         });
     };
 
+    const strength = passwordStrength(data.password);
+    const mismatch = data.password_confirmation && data.password !== data.password_confirmation;
+
     return (
-        <GuestLayout>
-            <Head title="Register" />
+        <GuestLayout
+            showTabs
+            title="Create your account"
+            subtitle="Sign up to upload decks and present them hands-free."
+        >
+            <Head title="Sign up" />
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} className="space-y-4">
+                <AuthInput
+                    id="name"
+                    name="name"
+                    label="Full name"
+                    icon={User}
+                    placeholder="Juan Dela Cruz"
+                    value={data.name}
+                    autoComplete="name"
+                    isFocused={true}
+                    required
+                    error={errors.name}
+                    onChange={(e) => setData('name', e.target.value)}
+                />
+
+                <AuthInput
+                    id="email"
+                    type="email"
+                    name="email"
+                    label="Email"
+                    icon={Mail}
+                    placeholder="you@example.com"
+                    value={data.email}
+                    autoComplete="username"
+                    required
+                    error={errors.email}
+                    onChange={(e) => setData('email', e.target.value)}
+                />
+
                 <div>
-                    <InputLabel htmlFor="name" value="Name" />
-
-                    <TextInput
-                        id="name"
-                        name="name"
-                        value={data.name}
-                        className="mt-1 block w-full"
-                        autoComplete="name"
-                        isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
-                    />
-
-                    <InputError message={errors.name} className="mt-2" />
-                </div>
-
-                <div className="mt-4">
-                    <InputLabel htmlFor="email" value="Email" />
-
-                    <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
-                        required
-                    />
-
-                    <InputError message={errors.email} className="mt-2" />
-                </div>
-
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
-
-                    <TextInput
+                    <AuthInput
                         id="password"
                         type="password"
                         name="password"
+                        label="Password"
+                        icon={Lock}
+                        placeholder="At least 8 characters"
                         value={data.password}
-                        className="mt-1 block w-full"
                         autoComplete="new-password"
+                        required
+                        error={errors.password}
                         onChange={(e) => setData('password', e.target.value)}
-                        required
                     />
-
-                    <InputError message={errors.password} className="mt-2" />
+                    {data.password && (
+                        <div className="mt-2 flex items-center space-x-2">
+                            <div className="grid flex-1 grid-cols-4 gap-1">
+                                {[1, 2, 3, 4].map((level) => (
+                                    <span
+                                        key={level}
+                                        className={`h-1.5 rounded-full transition-colors ${
+                                            strength >= level
+                                                ? strength >= 3 ? 'bg-emerald-600' : 'bg-clay-gold'
+                                                : 'bg-clay-gray/60'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                            <span className="w-16 text-right text-[10px] font-bold text-clay-charcoal/70">
+                                {STRENGTH_LABELS[strength]}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
+                <AuthInput
+                    id="password_confirmation"
+                    type="password"
+                    name="password_confirmation"
+                    label="Confirm password"
+                    icon={Lock}
+                    placeholder="Type it again"
+                    value={data.password_confirmation}
+                    autoComplete="new-password"
+                    required
+                    error={errors.password_confirmation || (mismatch ? 'Passwords do not match yet.' : null)}
+                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                />
 
-                    <TextInput
-                        id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
-                        value={data.password_confirmation}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        required
-                    />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
-                </div>
-
-                <div className="mt-4 flex items-center justify-end">
-                    <Link
-                        href={route('login')}
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    >
-                        Already registered?
-                    </Link>
-
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
-                    </PrimaryButton>
-                </div>
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="clay-btn-gold w-full py-3 text-sm inline-flex items-center justify-center space-x-2 disabled:opacity-60"
+                >
+                    <span>{processing ? 'Creating account...' : 'Create account'}</span>
+                    {!processing && <ArrowRight className="w-4 h-4" />}
+                </button>
             </form>
+
+            <p className="mt-6 text-center text-xs font-semibold text-clay-charcoal/70">
+                Already have an account?{' '}
+                <Link href={route('login')} className="font-black text-clay-charcoal underline decoration-clay-gold decoration-2 underline-offset-2">
+                    Log in
+                </Link>
+            </p>
         </GuestLayout>
     );
 }

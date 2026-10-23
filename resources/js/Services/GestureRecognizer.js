@@ -1,4 +1,27 @@
 // Gesture recognition handler using MediaPipe Hands
+
+// Turns a getUserMedia failure into a message the presenter can act on.
+export function describeCameraError(err) {
+    if (!window.isSecureContext) {
+        return 'Camera access needs a secure page. Open the app at http://localhost:8000 or http://127.0.0.1:8000 (or use HTTPS).';
+    }
+    switch (err?.name) {
+        case 'NotAllowedError':
+        case 'SecurityError':
+            return 'Camera permission was blocked. Click the camera icon in the address bar, allow access, then press Retry.';
+        case 'NotFoundError':
+        case 'DevicesNotFoundError':
+            return 'No camera was found. Plug in a webcam (or enable it in Windows Settings > Privacy > Camera), then press Retry.';
+        case 'NotReadableError':
+        case 'TrackStartError':
+            return 'The camera is being used by another app (Zoom, Teams, OBS, another tab). Close it, then press Retry.';
+        case 'OverconstrainedError':
+            return 'The selected camera is no longer available. Pick another camera from the list.';
+        default:
+            return err?.message || 'The camera could not be started.';
+    }
+}
+
 export class GestureEngine {
     constructor(options = {}) {
         this.videoElement = options.videoElement || null;
@@ -9,6 +32,7 @@ export class GestureEngine {
         this.cooldownMs = options.cooldownMs || 800;
         this.swipePixelThreshold = options.swipePixelThreshold || 55;
         this.fistHoldSeconds = options.fistHoldSeconds || 1.5;
+        this.palmHoldSeconds = options.palmHoldSeconds || 1.2;
         this.audioFeedback = options.audioFeedback ?? true;
         this.showLandmarkCanvas = options.showLandmarkCanvas ?? true;
 
@@ -20,12 +44,16 @@ export class GestureEngine {
         this.stream = null;
         this.hands = null;
         this.isRunning = false;
+        this.isDisposed = false;
         this.isCoolingDown = false;
         this.cooldownStartTime = 0;
         this.cooldownRaf = null;
 
         this.landmarkHistory = [];
         this.fistStartTime = null;
+        this.palmStartTime = null;
+        // A held pose fires once; the hand must change pose before it can fire again.
+        this.latchedPose = null;
         this.frameCount = 0;
         this.fps = 0;
         this.lastFpsUpdate = performance.now();
@@ -59,37 +87,71 @@ export class GestureEngine {
         }
     }
 
+    async openStream(deviceId) {
+        const size = { width: { ideal: 640 }, height: { ideal: 480 } };
+        if (deviceId) {
+            try {
+                return await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId }, ...size } });
+            } catch (err) {
+                // A saved camera may have been unplugged; fall back to whatever camera exists.
+                if (!['OverconstrainedError', 'NotFoundError'].includes(err?.name)) throw err;
+            }
+        }
+        try {
+            return await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', ...size } });
+        } catch (err) {
+            if (err?.name !== 'OverconstrainedError') throw err;
+            return navigator.mediaDevices.getUserMedia({ video: true });
+        }
+    }
+
     async initialize(deviceId = null) {
-        this.onStatusChange({ camera: 'connecting', hand: 'none' });
+        this.onStatusChange({ camera: 'connecting', hand: 'none', error: null });
 
         try {
-            const constraints = {
-                video: deviceId
-                    ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-                    : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
-            };
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw Object.assign(new Error('This browser cannot access cameras.'), { name: 'NotSupportedError' });
+            }
 
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await this.openStream(deviceId);
+            if (this.isDisposed) {
+                stream.getTracks().forEach(track => track.stop());
+                return false;
+            }
+            this.stream = stream;
+
             if (this.videoElement) {
                 this.videoElement.srcObject = this.stream;
                 await new Promise((resolve) => {
-                    this.videoElement.onloadedmetadata = () => {
-                        this.videoElement.play();
-                        resolve();
-                    };
+                    if (this.videoElement.readyState >= 1) return resolve();
+                    this.videoElement.onloadedmetadata = () => resolve();
                 });
+                await this.videoElement.play().catch(() => {});
             }
 
             await this.initMediaPipe();
+            if (this.isDisposed) {
+                this.hands?.close?.();
+                this.hands = null;
+                return false;
+            }
 
             this.isRunning = true;
             this.startFrameLoop();
-            this.onStatusChange({ camera: 'online', hand: 'searching' });
+            this.onStatusChange({
+                camera: 'online',
+                hand: 'searching',
+                error: null,
+                deviceId: this.stream.getVideoTracks()[0]?.getSettings?.().deviceId || null,
+            });
 
             return true;
         } catch (err) {
             console.error('Webcam error:', err);
-            this.onStatusChange({ camera: 'error', hand: 'none' });
+            if (!this.isDisposed) {
+                this.stop();
+                this.onStatusChange({ camera: 'error', hand: 'none', error: describeCameraError(err) });
+            }
             throw err;
         }
     }
@@ -112,6 +174,7 @@ export class GestureEngine {
         });
 
         this.hands.onResults(this.handleInferenceResults.bind(this));
+        await this.hands.initialize?.();
     }
 
     loadScript(src) {
@@ -166,6 +229,8 @@ export class GestureEngine {
     }
 
     handleInferenceResults(results) {
+        if (!this.isRunning) return;
+
         const canvas = this.canvasElement;
         const ctx = this.canvasCtx;
 
@@ -189,6 +254,8 @@ export class GestureEngine {
             this.onStatusChange({ camera: 'online', hand: 'none' });
             this.landmarkHistory = [];
             this.fistStartTime = null;
+            this.palmStartTime = null;
+            this.latchedPose = null;
             return;
         }
 
@@ -249,21 +316,31 @@ export class GestureEngine {
             this.landmarkHistory.shift();
         }
 
-        if (this.isCoolingDown) return;
-
         const isIndexExtended = this.distance(indexTip, wrist) > this.distance(indexMcp, wrist) * 1.25;
         const isMiddleExtended = this.distance(middleTip, wrist) > this.distance(middleMcp, wrist) * 1.25;
         const isRingExtended = this.distance(ringTip, wrist) > this.distance(ringMcp, wrist) * 1.25;
         const isPinkyExtended = this.distance(pinkyTip, wrist) > this.distance(pinkyMcp, wrist) * 1.25;
 
         const extendedFingers = [isIndexExtended, isMiddleExtended, isRingExtended, isPinkyExtended].filter(Boolean).length;
+        const pose = extendedFingers <= 1 ? 'fist' : extendedFingers === 4 ? 'palm' : 'other';
+
+        if (this.latchedPose && this.latchedPose !== pose) {
+            this.latchedPose = null;
+        }
+
+        if (this.isCoolingDown) {
+            this.fistStartTime = null;
+            this.palmStartTime = null;
+            return;
+        }
 
         // Closed fist check
-        if (extendedFingers <= 1) {
+        if (pose === 'fist' && this.latchedPose !== 'fist') {
             if (!this.fistStartTime) {
                 this.fistStartTime = now;
             } else if ((now - this.fistStartTime) / 1000 >= this.fistHoldSeconds) {
                 this.fistStartTime = null;
+                this.latchedPose = 'fist';
                 this.triggerGesture('fist', 'F5', 'Fullscreen', 95);
                 return;
             }
@@ -277,12 +354,13 @@ export class GestureEngine {
             const current = this.landmarkHistory[this.landmarkHistory.length - 1];
             const timeDiff = current.timestamp - oldest.timestamp;
 
-            if (timeDiff >= 80 && timeDiff <= 320) {
+            if (timeDiff >= 80 && timeDiff <= 350) {
                 const deltaX = current.x - oldest.x;
                 const deltaY = current.y - oldest.y;
                 const threshold = 0.12 - (this.sensitivity * 0.007);
 
                 if (Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+                    this.palmStartTime = null;
                     if (deltaX < -threshold) {
                         this.triggerGesture('swipe_right', 'ArrowRight', 'Next Slide', 92, deltaX, deltaY);
                         this.landmarkHistory = [];
@@ -296,7 +374,25 @@ export class GestureEngine {
             }
         }
 
-        // TODO: Open palm pause trigger for next phase
+        // Open palm held still -> pause / resume
+        if (pose === 'palm' && this.latchedPose !== 'palm' && this.isHandSteady()) {
+            if (!this.palmStartTime) {
+                this.palmStartTime = now;
+            } else if ((now - this.palmStartTime) / 1000 >= this.palmHoldSeconds) {
+                this.palmStartTime = null;
+                this.latchedPose = 'palm';
+                this.triggerGesture('open_palm', 'b', 'Pause / Resume', 90);
+            }
+        } else {
+            this.palmStartTime = null;
+        }
+    }
+
+    isHandSteady() {
+        if (this.landmarkHistory.length < 2) return true;
+        const xs = this.landmarkHistory.map(p => p.x);
+        const ys = this.landmarkHistory.map(p => p.y);
+        return Math.max(...xs) - Math.min(...xs) < 0.04 && Math.max(...ys) - Math.min(...ys) < 0.04;
     }
 
     distance(p1, p2) {
@@ -307,7 +403,7 @@ export class GestureEngine {
         if (this.isCoolingDown) return;
 
         this.startCooldown();
-        this.playBeep(type === 'fist' ? 880 : 540, 0.1);
+        this.playBeep(type === 'fist' ? 880 : type === 'open_palm' ? 440 : 540, 0.1);
 
         window.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true }));
         window.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, bubbles: true }));
@@ -350,11 +446,13 @@ export class GestureEngine {
     updateConfig(newConfig = {}) {
         if (newConfig.sensitivity !== undefined) this.sensitivity = newConfig.sensitivity;
         if (newConfig.cooldownMs !== undefined) this.cooldownMs = newConfig.cooldownMs;
+        if (newConfig.fistHoldSeconds !== undefined) this.fistHoldSeconds = newConfig.fistHoldSeconds;
         if (newConfig.showLandmarkCanvas !== undefined) this.showLandmarkCanvas = newConfig.showLandmarkCanvas;
         if (newConfig.audioFeedback !== undefined) this.audioFeedback = newConfig.audioFeedback;
     }
 
     stop() {
+        this.isDisposed = true;
         this.isRunning = false;
         this.isCoolingDown = false;
         if (this.cooldownRaf) cancelAnimationFrame(this.cooldownRaf);
@@ -363,9 +461,17 @@ export class GestureEngine {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
         }
+        if (this.hands) {
+            this.hands.close?.();
+            this.hands = null;
+        }
         if (this.videoElement) this.videoElement.srcObject = null;
         if (this.canvasCtx && this.canvasElement) {
             this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        }
+        if (this.audioCtx) {
+            this.audioCtx.close?.().catch(() => {});
+            this.audioCtx = null;
         }
 
         this.onStatusChange({ camera: 'offline', hand: 'none' });

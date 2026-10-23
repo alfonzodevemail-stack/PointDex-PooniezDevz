@@ -28,6 +28,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'libreoffice' => [
+        // Optional: full path to soffice. When found, PowerPoint uploads are converted to PDF.
+        'path' => env('LIBREOFFICE_PATH'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
