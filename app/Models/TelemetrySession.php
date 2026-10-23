@@ -32,6 +32,14 @@ class TelemetrySession extends Model
         'duration_seconds' => 'integer',
     ];
 
+    /**
+     * Sessions where the camera actually processed frames, so FPS and latency are real values.
+     */
+    public function scopeMeasured($query)
+    {
+        return $query->where('total_frames_processed', '>', 0);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

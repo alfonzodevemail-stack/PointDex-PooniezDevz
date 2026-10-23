@@ -20,8 +20,8 @@ class DashboardController extends Controller
         $stats = [
             'totalPresentations' => $presentations->count(),
             'totalSessions' => $user->telemetrySessions()->count(),
-            'avgLatency' => round($user->telemetrySessions()->avg('avg_latency_ms') ?? 0, 1),
-            'avgFps' => round($user->telemetrySessions()->avg('avg_fps') ?? 0, 1),
+            'avgLatency' => round($user->telemetrySessions()->measured()->avg('avg_latency_ms') ?? 0, 1),
+            'avgFps' => round($user->telemetrySessions()->measured()->avg('avg_fps') ?? 0, 1),
         ];
 
         $settings = GestureSetting::firstOrCreate(['user_id' => $user->id]);

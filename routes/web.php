@@ -24,8 +24,7 @@ Route::middleware('auth')->group(function () {
         'index', 'show', 'store', 'update', 'destroy'
     ]);
     Route::post('/presentations/{presentation}/content', [PresentationContentController::class, 'store'])->name('presentations.content.store');
-    Route::put('/presentations/{presentation}/slides', [PresentationContentController::class, 'reorder'])->name('presentations.slides.reorder');
-    Route::delete('/presentations/{presentation}/slides/{key}', [PresentationContentController::class, 'destroySlide'])->name('presentations.slides.destroy');
+    Route::put('/presentations/{presentation}/slides', [PresentationContentController::class, 'save'])->name('presentations.slides.save');
     Route::get('/presentations/{presentation}/assets/{asset}/file', [PresentationContentController::class, 'file'])->name('presentations.assets.file');
     Route::post('/presentations/{presentation}/assets/{asset}/ready', [PresentationContentController::class, 'ready'])->name('presentations.assets.ready');
     Route::delete('/presentations/{presentation}/assets/{asset}', [PresentationContentController::class, 'destroyAsset'])->name('presentations.assets.destroy');

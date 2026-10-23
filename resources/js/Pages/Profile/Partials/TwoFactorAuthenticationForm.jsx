@@ -69,11 +69,11 @@ export default function TwoFactorAuthenticationForm({ twoFactor, className = '' 
     return (
         <section className={className}>
             <header>
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className="text-base font-black text-clay-charcoal">
                     Two-Factor Authentication
                 </h2>
 
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-xs font-medium text-clay-charcoal/70">
                     Add a second step to your login: after your password, enter a 6-digit code from an
                     authenticator app on your phone.
                 </p>
@@ -86,7 +86,7 @@ export default function TwoFactorAuthenticationForm({ twoFactor, className = '' 
                             ? 'bg-emerald-100 text-emerald-800'
                             : twoFactor.pending
                             ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-100 text-gray-700'
+                            : 'bg-clay-charcoal text-clay-cream'
                     }`}
                 >
                     {twoFactor.enabled ? 'Enabled' : twoFactor.pending ? 'Finish setup' : 'Disabled'}
@@ -95,19 +95,19 @@ export default function TwoFactorAuthenticationForm({ twoFactor, className = '' 
 
             {twoFactor.pending && (
                 <div className="mt-4 space-y-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs font-bold text-emerald-700">
                         1. Scan this QR code with Google Authenticator, Microsoft Authenticator or Authy.
                         If you can't scan it, type the setup key into the app instead.
                     </p>
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div
-                            className="inline-block rounded-lg border border-gray-200 bg-white p-2 w-fit"
+                            className="inline-block rounded-xl bg-white p-2 shadow-md w-fit"
                             dangerouslySetInnerHTML={{ __html: twoFactor.qrCodeSvg }}
                         />
                         <div className="text-sm">
-                            <div className="font-medium text-gray-700">Setup key</div>
-                            <code className="mt-1 block break-all rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-800">
+                            <div className="font-extrabold text-clay-charcoal text-xs">Setup key</div>
+                            <code className="mt-1 block break-all clay-inset px-3 py-2 font-mono text-xs text-clay-charcoal">
                                 {twoFactor.setupKey}
                             </code>
                         </div>
@@ -138,12 +138,12 @@ export default function TwoFactorAuthenticationForm({ twoFactor, className = '' 
             )}
 
             {twoFactor.recoveryCodes && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-900">
+                <div className="mt-4 rounded-2xl bg-clay-gold/15 border border-clay-gold/40 p-4">
+                    <p className="text-xs font-bold text-clay-charcoal">
                         Save these recovery codes somewhere safe. Each one can be used once to log in if you
                         lose your phone. They won't be shown again.
                     </p>
-                    <div className="mt-3 grid grid-cols-2 gap-1 font-mono text-sm text-gray-800">
+                    <div className="mt-3 grid grid-cols-2 gap-1 font-mono text-sm font-bold text-clay-charcoal">
                         {twoFactor.recoveryCodes.map((code) => (
                             <div key={code}>{code}</div>
                         ))}

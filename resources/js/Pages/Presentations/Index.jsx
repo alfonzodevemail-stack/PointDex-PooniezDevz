@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
 import PresentationSourceModal from '@/Components/PresentationSourceModal';
@@ -20,6 +20,11 @@ function contentSummary(assets = []) {
 export default function PresentationsIndex({ presentations = [] }) {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+    // Going back to this page shows a cached copy; refresh so slide counts are current.
+    useEffect(() => {
+        router.reload({ only: ['presentations'] });
+    }, []);
 
     const deleteDeck = (id) => {
         router.delete(`/presentations/${id}`, {

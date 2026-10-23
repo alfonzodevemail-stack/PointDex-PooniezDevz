@@ -118,43 +118,94 @@ class PresentationImportTest extends TestCase
         $this->assertDatabaseCount('presentation_assets', 0);
     }
 
-    public function test_content_can_be_added_reordered_and_removed(): void
+    public function test_added_files_go_to_the_library_and_slides_change_only_on_save(): void
     {
         $user = User::factory()->create();
         $presentation = $this->createDeck($user, [$this->png('first.png')]);
+        $saved = $presentation->slides_data;
 
         $this->actingAs($user)->post(route('presentations.content.store', $presentation), [
             'source' => 'file',
             'files' => [$this->png('second.png')],
-        ])->assertSessionHasNoErrors();
+        ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('content_added', fn ($added) => count($added['asset_ids']) === 1 && $added['replace'] === false);
 
-        $keys = array_column($presentation->refresh()->slides_data, 'key');
-        $this->assertCount(2, $keys);
+        // The saved deck is untouched until the user presses Save.
+        $this->assertSame($saved, $presentation->refresh()->slides_data);
+        $this->assertCount(2, $presentation->assets);
+
+        $second = $presentation->assets()->where('original_filename', 'second.png')->sole();
+        $working = [
+            ['key' => 'k-second', 'asset_id' => $second->id, 'page' => 0],
+            $saved[0],
+        ];
 
         $this->actingAs($user)
-            ->putJson(route('presentations.slides.reorder', $presentation), ['order' => array_reverse($keys)])
-            ->assertOk();
-        $this->assertSame(array_reverse($keys), array_column($presentation->refresh()->slides_data, 'key'));
-
-        $this->actingAs($user)
-            ->deleteJson(route('presentations.slides.destroy', [$presentation, $keys[0]]))
+            ->putJson(route('presentations.slides.save', $presentation), ['slides' => $working])
             ->assertOk()
-            ->assertJsonCount(1, 'slides')
-            ->assertJsonCount(1, 'assets');
+            ->assertJsonCount(2, 'slides');
+
+        $this->assertSame($working, $presentation->refresh()->slides_data);
     }
 
-    public function test_reorder_must_contain_exactly_the_existing_slides(): void
+    public function test_removed_slides_keep_their_file_so_they_can_be_added_back(): void
     {
         $user = User::factory()->create();
         $presentation = $this->createDeck($user, [$this->png('a.png'), $this->png('b.png')]);
-        $keys = array_column($presentation->slides_data, 'key');
+        [$first, $second] = $presentation->slides_data;
 
         $this->actingAs($user)
-            ->putJson(route('presentations.slides.reorder', $presentation), ['order' => [$keys[0], $keys[0]]])
-            ->assertUnprocessable();
+            ->putJson(route('presentations.slides.save', $presentation), ['slides' => [$second]])
+            ->assertOk();
+
+        $this->assertCount(1, $presentation->refresh()->slides_data);
+        $this->assertCount(2, $presentation->assets, 'the removed slide\'s file stays in the library');
+
+        // Add it back from the library.
+        $this->actingAs($user)
+            ->putJson(route('presentations.slides.save', $presentation), ['slides' => [$second, $first]])
+            ->assertOk();
+
+        $this->assertCount(2, $presentation->refresh()->slides_data);
     }
 
-    public function test_replace_swaps_all_content(): void
+    public function test_save_rejects_slides_that_do_not_exist(): void
+    {
+        $user = User::factory()->create();
+        $presentation = $this->createDeck($user, [$this->png('a.png')]);
+        $slide = $presentation->slides_data[0];
+
+        // Page 5 of a picture, a file from another deck, and a duplicate key.
+        foreach ([
+            [[...$slide, 'page' => 5]],
+            [[...$slide, 'asset_id' => 999999]],
+            [$slide, $slide],
+        ] as $slides) {
+            $this->actingAs($user)
+                ->putJson(route('presentations.slides.save', $presentation), ['slides' => $slides])
+                ->assertUnprocessable();
+        }
+
+        $this->assertSame([$slide], $presentation->refresh()->slides_data);
+    }
+
+    public function test_library_files_can_be_deleted_permanently(): void
+    {
+        $user = User::factory()->create();
+        $presentation = $this->createDeck($user, [$this->png('a.png'), $this->png('b.png')]);
+        $asset = $presentation->assets()->orderBy('id')->first();
+
+        $this->actingAs($user)
+            ->deleteJson(route('presentations.assets.destroy', [$presentation, $asset]))
+            ->assertOk()
+            ->assertJsonCount(1, 'slides')
+            ->assertJsonCount(1, 'assets');
+
+        Storage::disk('local')->assertMissing($asset->file_path);
+    }
+
+    public function test_replace_flags_the_new_files_and_keeps_the_old_ones_in_the_library(): void
     {
         $user = User::factory()->create();
         $presentation = $this->createDeck($user, [$this->png('old.png')]);
@@ -164,12 +215,12 @@ class PresentationImportTest extends TestCase
             'source' => 'file',
             'replace' => true,
             'files' => [$this->png('new.png')],
-        ])->assertSessionHasNoErrors();
+        ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('content_added', fn ($added) => $added['replace'] === true);
 
-        $presentation->refresh();
-        $this->assertSame('new.png', $presentation->assets()->sole()->original_filename);
-        $this->assertCount(1, $presentation->slides_data);
-        Storage::disk('local')->assertMissing($oldAsset->file_path);
+        $this->assertCount(2, $presentation->assets);
+        Storage::disk('local')->assertExists($oldAsset->file_path);
     }
 
     public function test_google_slides_link_is_downloaded_as_pdf(): void

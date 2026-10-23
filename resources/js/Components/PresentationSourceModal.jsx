@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useForm } from '@inertiajs/react';
-import { Upload, Link2, X, FileText, Image as ImageIcon, Presentation as DeckIcon } from 'lucide-react';
+import { Upload, Link2, X, FileText, History, Image as ImageIcon, Presentation as DeckIcon } from 'lucide-react';
 
 const ACCEPT = '.pptx,.ppt,.pdf,.jpg,.jpeg,.png,.gif,.webp,image/*,application/pdf,'
     + 'application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint';
@@ -25,9 +25,13 @@ function FileKindIcon({ name }) {
 /**
  * Upload PowerPoint / PDF / pictures or paste a link.
  * mode "create" makes a new presentation, "add" appends slides, "replace" swaps all content.
+ * renderLibrary (add mode) renders the "Previous Slides" tab for re-adding slides from earlier uploads.
  */
-export default function PresentationSourceModal({ mode = 'create', presentationId = null, onClose }) {
+export default function PresentationSourceModal({ mode = 'create', presentationId = null, onClose, renderLibrary = null }) {
     const copy = COPY[mode];
+    const sources = renderLibrary
+        ? [...SOURCES, { key: 'library', label: 'Previous Slides', icon: History }]
+        : SOURCES;
     const inputRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
 
@@ -72,7 +76,7 @@ export default function PresentationSourceModal({ mode = 'create', presentationI
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-clay-charcoal/50 backdrop-blur-sm">
-            <div className="clay-card max-w-lg w-full p-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <div className={`clay-card w-full p-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto ${renderLibrary ? 'max-w-2xl' : 'max-w-lg'}`}>
                 <div className="flex items-center justify-between pb-3 border-b border-clay-gray/60">
                     <h3 className="text-base font-black text-clay-charcoal">{copy.heading}</h3>
                     <button
@@ -88,12 +92,13 @@ export default function PresentationSourceModal({ mode = 'create', presentationI
                 <form onSubmit={handleSubmit} className="space-y-4 mt-4 text-xs">
                     {mode === 'replace' && (
                         <p className="rounded-xl bg-clay-gold/20 px-3 py-2 font-bold text-clay-charcoal">
-                            All current slides will be replaced with the new file or link.
+                            All current slides will be replaced with the new file or link. The old slides stay
+                            under ADD &gt; Previous Slides, and nothing changes until you press Save.
                         </p>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                        {SOURCES.map(({ key, label, icon: Icon }) => (
+                    <div className={`grid gap-2 ${sources.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {sources.map(({ key, label, icon: Icon }) => (
                             <button
                                 key={key}
                                 type="button"
@@ -110,6 +115,8 @@ export default function PresentationSourceModal({ mode = 'create', presentationI
                             </button>
                         ))}
                     </div>
+
+                    {data.source === 'library' && renderLibrary(onClose)}
 
                     {data.source === 'file' && (
                         <div>
@@ -254,18 +261,20 @@ export default function PresentationSourceModal({ mode = 'create', presentationI
                         </>
                     )}
 
-                    <div className="pt-2 flex justify-end space-x-2">
-                        <button type="button" onClick={onClose} className="clay-btn-light px-4 py-2 text-xs">
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="clay-btn-gold px-5 py-2 text-xs disabled:opacity-60"
-                        >
-                            {processing ? copy.busy : copy.submit}
-                        </button>
-                    </div>
+                    {data.source !== 'library' && (
+                        <div className="pt-2 flex justify-end space-x-2">
+                            <button type="button" onClick={onClose} className="clay-btn-light px-4 py-2 text-xs">
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="clay-btn-gold px-5 py-2 text-xs disabled:opacity-60"
+                            >
+                                {processing ? copy.busy : copy.submit}
+                            </button>
+                        </div>
+                    )}
                 </form>
             </div>
         </div>

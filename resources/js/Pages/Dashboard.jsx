@@ -1,5 +1,5 @@
-import React from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useEffect } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
 import {
     Play,
@@ -9,6 +9,11 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard({ presentations = [], stats = {} }) {
+    // Going back to this page shows a cached copy; refresh so counts are current.
+    useEffect(() => {
+        router.reload({ only: ['presentations', 'stats', 'recentSessions'] });
+    }, []);
+
     return (
         <PointDexLayout title="Dashboard">
             <Head title="Dashboard - PointDex" />

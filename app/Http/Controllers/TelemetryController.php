@@ -117,8 +117,8 @@ class TelemetryController extends Controller
 
         $totalSessions = (clone $userSessions)->count();
         $totalGestures = (clone $userLogs)->count();
-        $avgLatency = round((clone $userLogs)->avg('latency_ms') ?: 0, 1);
-        $avgFps = round((clone $userSessions)->avg('avg_fps') ?: 0, 1);
+        $avgLatency = round((clone $userSessions)->measured()->avg('avg_latency_ms') ?: 0, 1);
+        $avgFps = round((clone $userSessions)->measured()->avg('avg_fps') ?: 0, 1);
         $successfulGestures = (clone $userLogs)->where('is_successful', true)->count();
         $accuracyRate = $totalGestures > 0 ? round(($successfulGestures / $totalGestures) * 100, 1) : 0;
 

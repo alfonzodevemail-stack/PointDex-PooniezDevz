@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Presentation;
+use App\Models\PresentationAsset;
 use App\Services\PresentationImporter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 trait ImportsPresentationContent
@@ -31,9 +33,11 @@ trait ImportsPresentationContent
     }
 
     /**
-     * Store the uploaded files (or the linked file) as assets and add their slides to the end of the deck.
+     * Store the uploaded files (or the linked file) as assets of the presentation.
+     *
+     * @return Collection<int, PresentationAsset>
      */
-    protected function importContent(Request $request, Presentation $presentation, PresentationImporter $importer): void
+    protected function importAssets(Request $request, Presentation $presentation, PresentationImporter $importer): Collection
     {
         $imported = [];
 
@@ -53,10 +57,6 @@ trait ImportsPresentationContent
             throw $e;
         }
 
-        // Pictures are one slide each; PDF and PowerPoint pages are counted by the browser,
-        // so they hold their place with a placeholder until then.
-        foreach ($imported as $attributes) {
-            $presentation->appendSlidesFor($presentation->assets()->create($attributes));
-        }
+        return collect($imported)->map(fn ($attributes) => $presentation->assets()->create($attributes));
     }
 }

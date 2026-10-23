@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Head } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
 import WebcamControllerPanel from '@/Components/WebcamControllerPanel';
+import useTelemetrySession from '@/Hooks/useTelemetrySession';
 import {
     ArrowRight,
     ArrowLeft,
@@ -11,6 +12,8 @@ import {
 } from 'lucide-react';
 
 export default function PracticeIndex({ settings = {} }) {
+    const { sessionCode, onTelemetryData } = useTelemetrySession({ mode: 'practice' });
+
     const [practiceScores, setPracticeScores] = useState({
         swipe_right: 0,
         swipe_left: 0,
@@ -147,6 +150,8 @@ export default function PracticeIndex({ settings = {} }) {
                     <div className="xl:col-span-4">
                         <WebcamControllerPanel
                             settings={settings}
+                            sessionCode={sessionCode}
+                            onTelemetryData={onTelemetryData}
                             onGesture={handleGestureDetected}
                         />
                     </div>

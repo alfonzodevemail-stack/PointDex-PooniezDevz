@@ -137,6 +137,31 @@ class PointDexTest extends TestCase
         );
     }
 
+    public function test_fps_and_latency_averages_only_use_measured_sessions(): void
+    {
+        $user = $this->signIn();
+        $user->telemetrySessions()->create(['session_code' => 'PDX-EMPTY1']); // camera never ran
+
+        $code = $this->postJson('/telemetry/start', ['mode' => 'practice'])->json('session.session_code');
+        $this->postJson('/telemetry/end', [
+            'session_code' => $code,
+            'total_frames_processed' => 900,
+            'avg_fps' => 29.6,
+            'avg_latency_ms' => 41.2,
+            'duration_seconds' => 30,
+        ])->assertOk();
+
+        $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+            ->where('stats.avgFps', 29.6)
+            ->where('stats.avgLatency', 41.2)
+        );
+
+        $this->get('/analytics')->assertInertia(fn (Assert $page) => $page
+            ->where('metrics.avgFps', 29.6)
+            ->where('metrics.avgLatency', 41.2)
+        );
+    }
+
     public function test_users_cannot_log_gestures_into_another_users_session(): void
     {
         $other = User::factory()->create();

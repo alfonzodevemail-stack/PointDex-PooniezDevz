@@ -104,12 +104,15 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
                                     <th className="px-3 py-2.5">Lighting</th>
                                     <th className="px-3 py-2.5">Distance</th>
                                     <th className="px-3 py-2.5">Gestures</th>
+                                    <th className="px-3 py-2.5">Avg FPS</th>
+                                    <th className="px-3 py-2.5">Latency</th>
+                                    <th className="px-3 py-2.5">Duration</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-clay-gray/50 font-medium">
                                 {sessions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-3 py-6 text-center text-clay-charcoal/60">
+                                        <td colSpan={8} className="px-3 py-6 text-center text-clay-charcoal/60">
                                             No sessions recorded yet. Open a presentation to start logging.
                                         </td>
                                     </tr>
@@ -121,6 +124,19 @@ export default function AnalyticsIndex({ sessions = [], metrics = {} }) {
                                             <td className="px-3 py-2.5">{s.lighting_condition}</td>
                                             <td className="px-3 py-2.5">{s.distance_meters}m</td>
                                             <td className="px-3 py-2.5 font-mono font-bold">{s.total_gestures_detected}</td>
+                                            {s.total_frames_processed > 0 ? (
+                                                <>
+                                                    <td className="px-3 py-2.5 font-mono">{s.avg_fps}</td>
+                                                    <td className="px-3 py-2.5 font-mono">{s.avg_latency_ms} ms</td>
+                                                    <td className="px-3 py-2.5 font-mono">
+                                                        {Math.floor(s.duration_seconds / 60)}m {s.duration_seconds % 60}s
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <td colSpan={3} className="px-3 py-2.5 text-clay-charcoal/50">
+                                                    Not measured
+                                                </td>
+                                            )}
                                         </tr>
                                     ))
                                 )}

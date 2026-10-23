@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import PointDexLayout from '@/Layouts/PointDexLayout';
 import WebcamControllerPanel from '@/Components/WebcamControllerPanel';
 import PresentationSourceModal from '@/Components/PresentationSourceModal';
+import SlideLibrary from '@/Components/SlideLibrary';
 import {
     PdfDeck,
     PptxDeck,
@@ -12,6 +13,7 @@ import {
     PptxThumbnailSource,
 } from '@/Components/DeckRenderers';
 import { loadPdf, releaseAssets } from '@/Services/AssetLoader';
+import useTelemetrySession from '@/Hooks/useTelemetrySession';
 import {
     ArrowLeft,
     ArrowRight,
@@ -24,29 +26,57 @@ import {
     Replace,
     Loader2,
     AlertTriangle,
-    GripVertical
+    GripVertical,
+    Save,
+    Check,
+    ChevronLeft
 } from 'lucide-react';
 
-export default function PresentationShow({ presentation, assets: initialAssets = [], settings = {} }) {
+const newKey = () => Math.random().toString(36).slice(2, 14);
+
+// A PDF / PowerPoint whose pages haven't been counted yet is one placeholder slide (page null).
+const slidesForAsset = (asset) => (asset.page_count == null
+    ? [{ key: newKey(), asset_id: asset.id, page: null }]
+    : Array.from({ length: asset.page_count }, (_, page) => ({ key: newKey(), asset_id: asset.id, page })));
+
+const expandPlaceholder = (slides, asset) => {
+    const index = slides.findIndex((s) => s.asset_id === asset.id && s.page === null);
+    if (index === -1 || asset.page_count == null) return slides;
+    return [...slides.slice(0, index), ...slidesForAsset(asset), ...slides.slice(index + 1)];
+};
+
+// What the deck looks like, ignoring slide keys (the server and browser may generate different ones).
+const signature = (slides) => slides.map((s) => `${s.asset_id}:${s.page}`).join(',');
+
+export default function PresentationShow({ presentation, assets: initialAssets = [], contentAdded = null, settings = {} }) {
     const [assets, setAssets] = useState(initialAssets);
-    const [slides, setSlides] = useState(presentation.slides_data || []);
+    const [slides, setSlides] = useState(presentation.slides_data || []);           // working copy
+    const [savedSlides, setSavedSlides] = useState(presentation.slides_data || []); // last saved
+    const [isSaving, setIsSaving] = useState(false);
+    const [leaveTarget, setLeaveTarget] = useState(null);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [isPresenting, setIsPresenting] = useState(false);
     const [isBlankScreen, setIsBlankScreen] = useState(false);
     const [lastActionToast, setLastActionToast] = useState(null);
-    const [sessionCode, setSessionCode] = useState(null);
+    const { sessionCode, onTelemetryData } = useTelemetrySession({ presentationId: presentation.id, mode: 'presentation' });
     const [gestureStatus, setGestureStatus] = useState({ camera: 'offline', hand: 'none', error: null });
     const [sourceModal, setSourceModal] = useState(null); // 'add' | 'replace'
     const [pptxNodes, setPptxNodes] = useState({});
     const [failedAssetIds, setFailedAssetIds] = useState([]);
     const [dragKey, setDragKey] = useState(null);
     const [dropIndex, setDropIndex] = useState(null);
-    const [pendingRemoveKey, setPendingRemoveKey] = useState(null);
+
+    const isDirty = signature(slides) !== signature(savedSlides);
 
     const slideCountRef = useRef(slides.length);
     slideCountRef.current = slides.length;
     const isPresentingRef = useRef(isPresenting);
     isPresentingRef.current = isPresenting;
+    const isDirtyRef = useRef(isDirty);
+    isDirtyRef.current = isDirty;
+    const slidesRef = useRef(slides);
+    slidesRef.current = slides;
+    const allowLeaveRef = useRef(false);
     const toastTimerRef = useRef(null);
     const reportedAssetIds = useRef(new Set());
 
@@ -54,11 +84,51 @@ export default function PresentationShow({ presentation, assets: initialAssets =
     const currentSlide = slides[currentSlideIndex] || null;
     const totalSlides = slides.length;
 
-    // Fresh props arrive after adding or replacing content.
+    const showToast = (message) => {
+        setLastActionToast(message);
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+            setLastActionToast(null);
+        }, 1600);
+    };
+
+    /* ---------- Keeping in sync with the server ---------- */
+
+    // Coming back to this page (e.g. with the browser's Back button) shows a cached copy; refresh it.
+    useEffect(() => {
+        router.reload({ only: ['presentation', 'assets'] });
+    }, []);
+
     useEffect(() => {
         setAssets(initialAssets);
-        setSlides(presentation.slides_data || []);
-    }, [initialAssets, presentation.slides_data]);
+    }, [initialAssets]);
+
+    // Fresh saved slides from the server replace the working copy, unless there are unsaved edits.
+    useEffect(() => {
+        const fresh = presentation.slides_data || [];
+        setSavedSlides(fresh);
+        if (!isDirtyRef.current) setSlides(fresh);
+    }, [presentation.slides_data]);
+
+    // Files just uploaded through ADD / Replace become part of the (unsaved) working copy.
+    useEffect(() => {
+        if (!contentAdded) return;
+        const added = contentAdded.asset_ids
+            .map((id) => initialAssets.find((a) => a.id === id))
+            .filter(Boolean)
+            .flatMap(slidesForAsset);
+
+        if (contentAdded.replace) {
+            setSlides(added);
+            setCurrentSlideIndex(0);
+            showToast('Replaced. Press Save to keep it');
+        } else {
+            setCurrentSlideIndex(slidesRef.current.length);
+            setSlides((prev) => [...prev, ...added]);
+            showToast('Added. Press Save to keep it');
+        }
+        router.replaceProp('contentAdded', null);
+    }, [contentAdded]);
 
     useEffect(() => {
         setCurrentSlideIndex((prev) => Math.min(prev, Math.max(slides.length - 1, 0)));
@@ -66,30 +136,57 @@ export default function PresentationShow({ presentation, assets: initialAssets =
 
     useEffect(() => releaseAssets, []);
 
-    useEffect(() => {
-        window.axios.post('/telemetry/start', {
-            presentation_id: presentation.id,
-            mode: 'presentation',
-        })
-            .then(({ data }) => {
-                if (data.success && data.session) {
-                    setSessionCode(data.session.session_code);
-                }
-            })
-            .catch(() => {});
-    }, []);
 
-    const showToast = (message) => {
-        setLastActionToast(message);
-        clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => {
-            setLastActionToast(null);
-        }, 1400);
+    /* ---------- Saving and leaving ---------- */
+
+    const saveSlides = useCallback(async () => {
+        setIsSaving(true);
+        try {
+            const sent = slidesRef.current;
+            const { data } = await window.axios.put(route('presentations.slides.save', presentation.id), {
+                slides: sent,
+            });
+            setSavedSlides(data.slides);
+            setAssets(data.assets);
+            // Keep any edits made while the request was in flight.
+            if (slidesRef.current === sent) setSlides(data.slides);
+            showToast('Saved');
+            return true;
+        } catch (e) {
+            showToast(e.response?.data?.message || 'Could not save. Try again.');
+            return false;
+        } finally {
+            setIsSaving(false);
+        }
+    }, [presentation.id]);
+
+    const leaveTo = (url) => {
+        allowLeaveRef.current = true;
+        setLeaveTarget(null);
+        router.visit(url);
     };
 
-    const applyContent = useCallback((data) => {
-        setSlides(data.slides);
-        setAssets(data.assets);
+    // Ask before leaving the page with unsaved changes.
+    useEffect(() => {
+        const removeGuard = router.on('before', (event) => {
+            const visit = event.detail.visit;
+            if (allowLeaveRef.current || !isDirtyRef.current || visit.method !== 'get') return;
+            if (visit.url.pathname === window.location.pathname) return;
+            setLeaveTarget(visit.url.href);
+            return false;
+        });
+
+        const handleBeforeUnload = (e) => {
+            if (!isDirtyRef.current) return;
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            removeGuard();
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
     }, []);
 
     /* ---------- Page counting for newly added PDF / PowerPoint files ---------- */
@@ -99,9 +196,14 @@ export default function PresentationShow({ presentation, assets: initialAssets =
         reportedAssetIds.current.add(asset.id);
         window.axios
             .post(route('presentations.assets.ready', [presentation.id, asset.id]), { page_count: pageCount })
-            .then(({ data }) => applyContent(data))
+            .then(({ data }) => {
+                const updated = data.assets.find((a) => a.id === asset.id);
+                setAssets(data.assets);
+                setSavedSlides(data.slides);
+                if (updated) setSlides((prev) => expandPlaceholder(prev, updated));
+            })
             .catch(() => reportedAssetIds.current.delete(asset.id));
-    }, [presentation.id, applyContent]);
+    }, [presentation.id]);
 
     const markAssetFailed = useCallback((asset) => {
         setFailedAssetIds((prev) => (prev.includes(asset.id) ? prev : [...prev, asset.id]));
@@ -183,8 +285,13 @@ export default function PresentationShow({ presentation, assets: initialAssets =
 
     useEffect(() => {
         const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                if (isDirtyRef.current) saveSlides();
+                return;
+            }
             // Gestures are handled through onGesture; skip the synthetic key events they also emit.
-            if (!e.isTrusted || sourceModal) return;
+            if (!e.isTrusted || sourceModal || leaveTarget) return;
             if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase())) {
                 return;
             }
@@ -208,7 +315,7 @@ export default function PresentationShow({ presentation, assets: initialAssets =
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [nextSlide, prevSlide, togglePresenting, exitPresenting, toggleBlank, sourceModal]);
+    }, [nextSlide, prevSlide, togglePresenting, exitPresenting, toggleBlank, saveSlides, sourceModal, leaveTarget]);
 
     const handleGesture = useCallback((gesture) => {
         switch (gesture.type) {
@@ -237,7 +344,7 @@ export default function PresentationShow({ presentation, assets: initialAssets =
         });
     }, []);
 
-    /* ---------- Editing: reorder and remove ---------- */
+    /* ---------- Editing the working copy ---------- */
 
     const moveSlide = (key, insertAt) => {
         const from = slides.findIndex((s) => s.key === key);
@@ -245,7 +352,6 @@ export default function PresentationShow({ presentation, assets: initialAssets =
         const to = insertAt > from ? insertAt - 1 : insertAt;
         if (to === from) return;
 
-        const previous = slides;
         const reordered = [...slides];
         const [moved] = reordered.splice(from, 1);
         reordered.splice(to, 0, moved);
@@ -253,28 +359,30 @@ export default function PresentationShow({ presentation, assets: initialAssets =
         const currentKey = currentSlide?.key;
         setSlides(reordered);
         setCurrentSlideIndex(Math.max(reordered.findIndex((s) => s.key === currentKey), 0));
-
-        window.axios
-            .put(route('presentations.slides.reorder', presentation.id), { order: reordered.map((s) => s.key) })
-            .catch(() => {
-                setSlides(previous);
-                showToast('Could not save the new order');
-            });
     };
 
     const removeSlide = (key) => {
-        setPendingRemoveKey(null);
-        window.axios
-            .delete(route('presentations.slides.destroy', [presentation.id, key]))
-            .then(({ data }) => applyContent(data))
-            .catch(() => showToast('Could not remove the slide'));
+        setSlides((prev) => prev.filter((s) => s.key !== key));
+        showToast('Slide removed. Add it back from ADD > Previous Slides');
     };
 
-    const removeAsset = (asset) => {
+    const addFromLibrary = (picked) => {
+        setCurrentSlideIndex(slides.length);
+        setSlides((prev) => [...prev, ...picked.map((p) => ({ key: newKey(), ...p }))]);
+        setSourceModal(null);
+        showToast(`${picked.length} ${picked.length === 1 ? 'slide' : 'slides'} added. Press Save to keep them`);
+    };
+
+    // Deleting a file from the library is permanent and saved right away.
+    const deleteAsset = (asset) => {
         window.axios
             .delete(route('presentations.assets.destroy', [presentation.id, asset.id]))
-            .then(({ data }) => applyContent(data))
-            .catch(() => showToast('Could not remove the file'));
+            .then(({ data }) => {
+                setAssets(data.assets);
+                setSavedSlides(data.slides);
+                setSlides((prev) => prev.filter((s) => s.asset_id !== asset.id));
+            })
+            .catch(() => showToast('Could not delete the file'));
     };
 
     const handleDragOver = (e, index) => {
@@ -296,7 +404,31 @@ export default function PresentationShow({ presentation, assets: initialAssets =
 
     const readyAssets = assets.filter((a) => a.page_count != null);
     const handVisible = gestureStatus.hand === 'detected';
-    const fileSummary = assets.map((a) => a.original_filename).filter(Boolean).join(' · ');
+    const fileSummary = [...new Set(slides.map((s) => assetsById[s.asset_id]?.original_filename).filter(Boolean))].join(' · ');
+
+    // A PDF / PowerPoint still being read holds its place with one placeholder slide.
+    const renderPlaceholder = (asset, compact) => {
+        const failed = failedAssetIds.includes(asset.id);
+        return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 text-clay-cream gap-1">
+                {failed ? (
+                    <>
+                        <AlertTriangle className={compact ? 'w-4 h-4 text-clay-gold' : 'w-8 h-8 text-clay-gold'} />
+                        <span className={`${compact ? 'text-[10px]' : 'text-sm'} font-bold leading-tight`}>
+                            Couldn't read {asset.original_filename}
+                        </span>
+                    </>
+                ) : (
+                    <>
+                        <Loader2 className={`animate-spin text-clay-gold ${compact ? 'w-4 h-4' : 'w-8 h-8'}`} />
+                        <span className={`${compact ? 'text-[10px]' : 'text-sm'} font-bold leading-tight truncate max-w-full`}>
+                            Preparing {asset.original_filename}...
+                        </span>
+                    </>
+                )}
+            </div>
+        );
+    };
 
     const renderStage = () => {
         if (!currentSlide) {
@@ -338,40 +470,6 @@ export default function PresentationShow({ presentation, assets: initialAssets =
         );
     };
 
-    // A PDF / PowerPoint still being read holds its place with one placeholder slide.
-    const renderPlaceholder = (asset, compact) => {
-        const failed = failedAssetIds.includes(asset.id);
-        return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 text-clay-cream gap-1">
-                {failed ? (
-                    <>
-                        <AlertTriangle className={compact ? 'w-4 h-4 text-clay-gold' : 'w-8 h-8 text-clay-gold'} />
-                        <span className={`${compact ? 'text-[10px]' : 'text-sm'} font-bold leading-tight`}>
-                            Couldn't read {asset.original_filename}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                removeAsset(asset);
-                            }}
-                            className={`${compact ? 'text-[10px]' : 'text-xs'} font-bold underline text-clay-gold`}
-                        >
-                            Remove
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <Loader2 className={`animate-spin text-clay-gold ${compact ? 'w-4 h-4' : 'w-8 h-8'}`} />
-                        <span className={`${compact ? 'text-[10px]' : 'text-sm'} font-bold leading-tight truncate max-w-full`}>
-                            Preparing {asset.original_filename}...
-                        </span>
-                    </>
-                )}
-            </div>
-        );
-    };
-
     const renderThumbnail = (slide) => {
         const asset = assetsById[slide.asset_id];
         if (!asset) return null;
@@ -394,7 +492,7 @@ export default function PresentationShow({ presentation, assets: initialAssets =
 
     return (
         <PointDexLayout title={presentation.title}>
-            <Head title={`${presentation.title} - PointDex`} />
+            <Head title={`${isDirty ? '* ' : ''}${presentation.title} - PointDex`} />
 
             {/* Off-screen PowerPoint renderers that feed the thumbnails */}
             {assets
@@ -411,16 +509,27 @@ export default function PresentationShow({ presentation, assets: initialAssets =
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 <div className="xl:col-span-8 flex flex-col space-y-4">
                     {/* Top Bar */}
-                    <div className="clay-card-sm px-5 py-3 flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">
-                            <h1 className="text-base sm:text-lg font-black text-clay-charcoal truncate">
-                                {presentation.title}
-                            </h1>
-                            {fileSummary && (
-                                <p className="text-[11px] font-semibold text-clay-charcoal/60 truncate">
-                                    {fileSummary}
-                                </p>
-                            )}
+                    <div className="clay-card-sm px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <button
+                                type="button"
+                                onClick={() => router.visit('/presentations')}
+                                title="Back to My Presentations"
+                                className="clay-btn-light px-2.5 py-1.5 text-xs flex items-center space-x-1 flex-shrink-0"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>Back</span>
+                            </button>
+                            <div className="min-w-0">
+                                <h1 className="text-base sm:text-lg font-black text-clay-charcoal truncate">
+                                    {presentation.title}
+                                </h1>
+                                {fileSummary && (
+                                    <p className="text-[11px] font-semibold text-clay-charcoal/60 truncate">
+                                        {fileSummary}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex items-center space-x-2">
@@ -443,6 +552,25 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                             >
                                 <Replace className="w-3.5 h-3.5" />
                                 <span>Replace</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={saveSlides}
+                                disabled={!isDirty || isSaving}
+                                title={isDirty ? 'Save changes (Ctrl+S)' : 'All changes saved'}
+                                className={`px-3 py-1.5 text-xs flex items-center space-x-1.5 ${
+                                    isDirty ? 'clay-btn-gold' : 'clay-btn-light opacity-70'
+                                }`}
+                            >
+                                {isSaving ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : isDirty ? (
+                                    <Save className="w-3.5 h-3.5" />
+                                ) : (
+                                    <Check className="w-3.5 h-3.5" />
+                                )}
+                                <span>{isSaving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}</span>
                             </button>
                         </div>
                     </div>
@@ -508,6 +636,7 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                         <div className="flex items-center justify-between mb-2.5 px-0.5">
                             <span className="text-[11px] font-extrabold text-clay-cream">
                                 Slides <span className="font-mono text-clay-cream/60">({totalSlides})</span>
+                                {isDirty && <span className="ml-2 text-clay-gold">· Unsaved changes</span>}
                             </span>
                             <span className="text-[10px] font-semibold text-clay-cream/50">
                                 Drag slides to change the order
@@ -529,7 +658,6 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                                         draggable
                                         onDragStart={(e) => {
                                             setDragKey(slide.key);
-                                            setPendingRemoveKey(null);
                                             e.dataTransfer.effectAllowed = 'move';
                                             e.dataTransfer.setData('text/plain', slide.key);
                                         }}
@@ -565,38 +693,13 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setPendingRemoveKey(slide.key);
+                                                removeSlide(slide.key);
                                             }}
                                             title="Remove slide"
                                             className="absolute bottom-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-clay-charcoal/85 text-clay-cream flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600"
                                         >
                                             <X className="w-3.5 h-3.5" />
                                         </button>
-
-                                        {pendingRemoveKey === slide.key && (
-                                            <div
-                                                className="absolute inset-0 z-30 bg-clay-charcoal/90 flex flex-col items-center justify-center gap-1.5"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <span className="text-[11px] font-bold text-clay-cream">Remove this slide?</span>
-                                                <div className="flex gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeSlide(slide.key)}
-                                                        className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[10px] font-bold"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPendingRemoveKey(null)}
-                                                        className="px-2.5 py-1 rounded-lg bg-clay-cream text-clay-charcoal text-[10px] font-bold"
-                                                    >
-                                                        Keep
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 );
                             })}
@@ -658,6 +761,7 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                     <WebcamControllerPanel
                         settings={settings}
                         sessionCode={sessionCode}
+                        onTelemetryData={onTelemetryData}
                         onGesture={handleGesture}
                         onStatus={handleGestureStatus}
                     />
@@ -669,7 +773,64 @@ export default function PresentationShow({ presentation, assets: initialAssets =
                     mode={sourceModal}
                     presentationId={presentation.id}
                     onClose={() => setSourceModal(null)}
+                    renderLibrary={sourceModal === 'add'
+                        ? () => (
+                            <SlideLibrary
+                                assets={assets}
+                                slides={slides}
+                                onAdd={addFromLibrary}
+                                onDeleteAsset={deleteAsset}
+                            />
+                        )
+                        : null}
                 />
+            )}
+
+            {/* Unsaved changes warning */}
+            {leaveTarget && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-clay-charcoal/50 backdrop-blur-sm">
+                    <div className="clay-card max-w-md w-full p-6 relative" role="alertdialog" aria-labelledby="leave-title">
+                        <button
+                            type="button"
+                            onClick={() => setLeaveTarget(null)}
+                            className="absolute top-4 right-4 clay-btn-light w-8 h-8 flex items-center justify-center"
+                            aria-label="Stay on this page"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+
+                        <div className="w-11 h-11 rounded-full bg-clay-gold/25 flex items-center justify-center">
+                            <AlertTriangle className="w-5 h-5 text-clay-charcoal" />
+                        </div>
+                        <h3 id="leave-title" className="mt-3 text-base font-black text-clay-charcoal">
+                            Leave without saving?
+                        </h3>
+                        <p className="mt-1 text-xs font-medium text-clay-charcoal/75">
+                            You have unsaved changes to this presentation. If you continue, they will be lost.
+                        </p>
+
+                        <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => leaveTo(leaveTarget)}
+                                className="clay-btn-light px-4 py-2 text-xs"
+                            >
+                                Continue without saving
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isSaving}
+                                onClick={async () => {
+                                    if (await saveSlides()) leaveTo(leaveTarget);
+                                }}
+                                className="clay-btn-gold px-4 py-2 text-xs inline-flex items-center justify-center space-x-1.5 disabled:opacity-60"
+                            >
+                                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                <span>Save and continue</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </PointDexLayout>
     );

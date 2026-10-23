@@ -8,17 +8,20 @@ use App\Models\PresentationAsset;
 use App\Services\PresentationImporter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Editing a deck's content: adding or replacing files, ordering and removing slides.
+ * Editing a deck's content. Uploaded files are kept with the presentation (its library)
+ * so removed slides can be added back; the slide order only changes when the user saves.
  */
 class PresentationContentController extends Controller
 {
     use ImportsPresentationContent;
 
     /**
-     * Add files or a link to the end of the deck, or replace everything when "replace" is set.
+     * Upload files or import a link into the presentation's library.
+     * The page then adds the new slides to its unsaved working copy.
      */
     public function store(Request $request, Presentation $presentation, PresentationImporter $importer)
     {
@@ -29,26 +32,13 @@ class PresentationContentController extends Controller
             ...$this->contentRules(),
         ], $this->contentMessages());
 
-        $previousAssets = $request->boolean('replace') ? $presentation->assets()->get() : collect();
+        $assets = $this->importAssets($request, $presentation, $importer);
 
-        $this->importContent($request, $presentation, $importer);
-
-        if ($previousAssets->isNotEmpty()) {
-            $removedIds = $previousAssets->pluck('id')->all();
-            $presentation->update([
-                'slides_data' => collect($presentation->slides_data)
-                    ->reject(fn ($slide) => in_array($slide['asset_id'], $removedIds, true))
-                    ->values()
-                    ->all(),
-            ]);
-
-            foreach ($previousAssets as $asset) {
-                $importer->delete($asset->file_path);
-                $asset->delete();
-            }
-        }
-
-        return back()->with('success', $previousAssets->isNotEmpty() ? 'Presentation replaced.' : 'Content added.');
+        return back()->with('content_added', [
+            'asset_ids' => $assets->pluck('id')->all(),
+            'replace' => $request->boolean('replace'),
+            'nonce' => Str::random(8),
+        ]);
     }
 
     public function file(Request $request, Presentation $presentation, PresentationAsset $asset, PresentationImporter $importer)
@@ -62,7 +52,8 @@ class PresentationContentController extends Controller
     }
 
     /**
-     * The browser reports how many pages a PDF / PowerPoint has; its slides are then added to the deck.
+     * The browser reports how many pages a PDF / PowerPoint has; a saved placeholder
+     * slide for it is swapped for its real slides.
      */
     public function ready(Request $request, Presentation $presentation, PresentationAsset $asset): JsonResponse
     {
@@ -80,61 +71,62 @@ class PresentationContentController extends Controller
         return $this->content($presentation);
     }
 
+    /**
+     * Permanently delete a file from the library, along with any saved slides that use it.
+     */
     public function destroyAsset(Request $request, Presentation $presentation, PresentationAsset $asset, PresentationImporter $importer): JsonResponse
     {
         $this->authorizeOwner($request, $presentation, $asset);
 
-        $this->removeSlidesWhere($presentation, fn ($slide) => $slide['asset_id'] === $asset->id);
+        $presentation->update([
+            'slides_data' => collect($presentation->slides_data)
+                ->reject(fn ($slide) => $slide['asset_id'] === $asset->id)
+                ->values()
+                ->all(),
+        ]);
         $importer->delete($asset->file_path);
         $asset->delete();
 
         return $this->content($presentation);
     }
 
-    public function reorder(Request $request, Presentation $presentation): JsonResponse
+    /**
+     * Save the working slide list: its order, removed slides and slides added back.
+     */
+    public function save(Request $request, Presentation $presentation): JsonResponse
     {
         $this->authorizeOwner($request, $presentation);
 
         $validated = $request->validate([
-            'order' => 'required|array',
-            'order.*' => 'string',
+            'slides' => 'present|array|max:2000',
+            'slides.*.key' => 'required|string|max:40|distinct',
+            'slides.*.asset_id' => 'required|integer',
+            'slides.*.page' => 'nullable|integer|min:0',
         ]);
 
-        $slides = collect($presentation->slides_data)->keyBy('key');
-        $order = $validated['order'];
+        $assets = $presentation->assets()->get()->keyBy('id');
+        $slides = [];
 
-        if (count($order) !== $slides->count() || count(array_unique($order)) !== count($order) || $slides->keys()->diff($order)->isNotEmpty()) {
-            throw ValidationException::withMessages(['order' => 'The slide list changed. Reload the page and try again.']);
+        foreach ($validated['slides'] as $index => $slide) {
+            $asset = $assets->get($slide['asset_id']);
+            $page = $slide['page'] ?? null;
+
+            $valid = $asset && ($asset->page_count === null
+                ? $page === null
+                : $page !== null && $page < $asset->page_count);
+
+            if (! $valid) {
+                throw ValidationException::withMessages([
+                    "slides.$index" => 'One of the slides no longer exists. Reload the page and try again.',
+                ]);
+            }
+
+            $slides[] = ['key' => $slide['key'], 'asset_id' => $asset->id, 'page' => $page];
         }
 
-        $presentation->update([
-            'slides_data' => array_map(fn ($key) => $slides[$key], $order),
-        ]);
+        $presentation->update(['slides_data' => $slides]);
 
         return $this->content($presentation);
-    }
-
-    public function destroySlide(Request $request, Presentation $presentation, string $key, PresentationImporter $importer): JsonResponse
-    {
-        $this->authorizeOwner($request, $presentation);
-
-        $this->removeSlidesWhere($presentation, fn ($slide) => $slide['key'] === $key);
-
-        // Drop files that no longer have any slide in the deck.
-        $usedAssetIds = collect($presentation->slides_data)->pluck('asset_id')->unique()->all();
-        foreach ($presentation->assets()->whereNotIn('id', $usedAssetIds)->get() as $asset) {
-            $importer->delete($asset->file_path);
-            $asset->delete();
-        }
-
-        return $this->content($presentation);
-    }
-
-    private function removeSlidesWhere(Presentation $presentation, callable $matches): void
-    {
-        $presentation->update([
-            'slides_data' => collect($presentation->slides_data)->reject($matches)->values()->all(),
-        ]);
     }
 
     private function content(Presentation $presentation): JsonResponse

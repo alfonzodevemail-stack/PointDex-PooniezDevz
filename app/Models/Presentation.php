@@ -38,28 +38,20 @@ class Presentation extends Model
     }
 
     /**
-     * Swap the asset's placeholder for its real slides, in the same position.
+     * Swap the asset's saved placeholder (if any) for its real slides, in the same position.
      */
     public function expandPlaceholderFor(PresentationAsset $asset): void
     {
         $slides = $this->slides_data ?? [];
-        $position = null;
 
         foreach ($slides as $index => $slide) {
             if ($slide['asset_id'] === $asset->id && $slide['page'] === null) {
-                $position = $index;
-                break;
+                array_splice($slides, $index, 1, $this->slidesFor($asset));
+                $this->update(['slides_data' => $slides]);
+
+                return;
             }
         }
-
-        if ($position === null) {
-            $this->appendSlidesFor($asset);
-
-            return;
-        }
-
-        array_splice($slides, $position, 1, $this->slidesFor($asset));
-        $this->update(['slides_data' => $slides]);
     }
 
     /**

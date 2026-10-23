@@ -36,6 +36,7 @@ class PresentationController extends Controller
         return Inertia::render('Presentations/Show', [
             'presentation' => $presentation,
             'assets' => $presentation->assets()->get(),
+            'contentAdded' => session('content_added'),
             'settings' => $settings,
         ]);
     }
@@ -55,7 +56,9 @@ class PresentationController extends Controller
         ]);
 
         try {
-            $this->importContent($request, $presentation, $importer);
+            foreach ($this->importAssets($request, $presentation, $importer) as $asset) {
+                $presentation->appendSlidesFor($asset);
+            }
         } catch (ValidationException $e) {
             $presentation->delete();
 
