@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Presentation;
+use App\Models\TelemetrySession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PointDexTest extends TestCase
@@ -17,9 +18,12 @@ class PointDexTest extends TestCase
         $this->seed();
     }
 
-    protected function signIn(): void
+    protected function signIn(): User
     {
-        $this->actingAs(User::first());
+        $user = User::first();
+        $this->actingAs($user);
+
+        return $user;
     }
 
     public function test_guests_are_redirected_to_login(): void
@@ -41,10 +45,11 @@ class PointDexTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_sample_presentation_can_be_viewed(): void
+    public function test_own_presentation_can_be_viewed(): void
     {
-        $presentation = Presentation::first();
-        $this->signIn();
+        $user = $this->signIn();
+        $presentation = $user->presentations()->create(['title' => 'Deck', 'slides_data' => []]);
+
         $response = $this->get("/presentations/{$presentation->id}");
         $response->assertStatus(200);
     }
@@ -65,10 +70,11 @@ class PointDexTest extends TestCase
 
     public function test_telemetry_session_can_be_started_and_logged(): void
     {
-        $presentation = Presentation::first();
+        $user = $this->signIn();
+        $presentation = $user->presentations()->create(['title' => 'Deck', 'slides_data' => []]);
 
         // 1. Start telemetry session
-        $startResponse = $this->postJson('/api/telemetry/start', [
+        $startResponse = $this->postJson('/telemetry/start', [
             'presentation_id' => $presentation->id,
             'mode' => 'presentation',
             'lighting_condition' => 'indoor_office',
@@ -80,9 +86,10 @@ class PointDexTest extends TestCase
 
         $sessionCode = $startResponse->json('session.session_code');
         $this->assertNotEmpty($sessionCode);
+        $this->assertSame($user->id, TelemetrySession::firstWhere('session_code', $sessionCode)->user_id);
 
         // 2. Log gesture event
-        $logResponse = $this->postJson('/api/telemetry/log', [
+        $logResponse = $this->postJson('/telemetry/log', [
             'session_code' => $sessionCode,
             'gesture_type' => 'swipe_right',
             'confidence' => 0.95,
@@ -95,7 +102,7 @@ class PointDexTest extends TestCase
         $logResponse->assertJson(['success' => true]);
 
         // 3. End session
-        $endResponse = $this->postJson('/api/telemetry/end', [
+        $endResponse = $this->postJson('/telemetry/end', [
             'session_code' => $sessionCode,
             'avg_fps' => 29.8,
             'avg_latency_ms' => 41.5,
@@ -103,5 +110,43 @@ class PointDexTest extends TestCase
 
         $endResponse->assertStatus(200);
         $endResponse->assertJson(['success' => true]);
+    }
+
+    public function test_analytics_only_shows_the_users_own_data(): void
+    {
+        $user = $this->signIn();
+        $mine = $user->telemetrySessions()->create(['session_code' => 'PDX-MINE01']);
+        $mine->logs()->create(['gesture_type' => 'swipe_right']);
+
+        $other = User::factory()->create();
+        $theirs = $other->telemetrySessions()->create(['session_code' => 'PDX-THEIRS']);
+        $theirs->logs()->create(['gesture_type' => 'fist']);
+        $theirs->logs()->create(['gesture_type' => 'fist']);
+
+        $this->get('/analytics')->assertInertia(fn (Assert $page) => $page
+            ->has('sessions', 1)
+            ->where('sessions.0.session_code', 'PDX-MINE01')
+            ->where('metrics.totalSessions', 1)
+            ->where('metrics.totalGestures', 1)
+            ->has('metrics.gestureDistribution', 1)
+        );
+
+        $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+            ->where('stats.totalSessions', 1)
+            ->has('recentSessions', 1)
+        );
+    }
+
+    public function test_users_cannot_log_gestures_into_another_users_session(): void
+    {
+        $other = User::factory()->create();
+        $other->telemetrySessions()->create(['session_code' => 'PDX-THEIRS']);
+
+        $this->signIn();
+
+        $this->postJson('/telemetry/log', [
+            'session_code' => 'PDX-THEIRS',
+            'gesture_type' => 'swipe_right',
+        ])->assertNotFound();
     }
 }

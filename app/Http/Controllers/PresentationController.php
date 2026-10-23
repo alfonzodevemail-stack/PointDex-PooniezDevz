@@ -4,22 +4,23 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
+use App\Http\Controllers\Concerns\ImportsPresentationContent;
 use App\Models\Presentation;
 use App\Models\GestureSetting;
 use App\Services\PresentationImporter;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class PresentationController extends Controller
 {
+    use ImportsPresentationContent;
+
     public function index(Request $request)
     {
-        $userId = $request->user()?->id;
-
-        $presentations = Presentation::when($userId, function ($q) use ($userId) {
-            $q->where('user_id', $userId)->orWhere('is_sample', true);
-        }, function ($q) {
-            $q->where('is_sample', true);
-        })->latest()->get();
+        $presentations = $request->user()->presentations()
+            ->with('assets')
+            ->latest()
+            ->get();
 
         return Inertia::render('Presentations/Index', [
             'presentations' => $presentations,
@@ -30,68 +31,36 @@ class PresentationController extends Controller
     {
         abort_unless($presentation->isViewableBy($request->user()), 403);
 
-        $userId = $request->user()?->id;
-        $settings = $userId
-            ? GestureSetting::firstOrCreate(['user_id' => $userId])
-            : (GestureSetting::first() ?? new GestureSetting());
+        $settings = GestureSetting::firstOrCreate(['user_id' => $request->user()->id]);
 
         return Inertia::render('Presentations/Show', [
             'presentation' => $presentation,
-            'fileUrl' => $presentation->file_path ? route('presentations.file', $presentation) : null,
+            'assets' => $presentation->assets()->get(),
             'settings' => $settings,
-        ]);
-    }
-
-    public function file(Presentation $presentation, Request $request, PresentationImporter $importer)
-    {
-        abort_unless($presentation->isViewableBy($request->user()) && $presentation->file_path, 404);
-
-        $contentType = $presentation->source_type === 'pdf'
-            ? 'application/pdf'
-            : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-
-        return response()->file($importer->absolutePath($presentation->file_path), [
-            'Content-Type' => $contentType,
-            'Cache-Control' => 'private, max-age=3600',
         ]);
     }
 
     public function store(Request $request, PresentationImporter $importer)
     {
-        $validated = $request->validate([
-            'source' => 'nullable|string|in:blank,file,link',
+        $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'aspect_ratio' => 'nullable|string|in:16:9,4:3',
-            'file' => 'required_if:source,file|nullable|file|extensions:pptx,ppt,pdf|max:'.(PresentationImporter::MAX_BYTES / 1024),
-            'presentation_url' => 'required_if:source,link|nullable|url:http,https|max:2048',
-            'slides_data' => 'nullable|array',
-        ], [
-            'file.required_if' => 'Choose a PowerPoint or PDF file to upload.',
-            'file.extensions' => 'Only .pptx, .ppt and .pdf files are supported.',
-            'file.max' => 'The file must be 100 MB or smaller.',
-            'presentation_url.required_if' => 'Paste a link to your presentation.',
+            ...$this->contentRules(),
+        ], $this->contentMessages());
+
+        $presentation = $request->user()->presentations()->create([
+            'title' => $request->input('title'),
+            'description' => $request->input('description'),
+            'slides_data' => [],
         ]);
 
-        $source = $validated['source'] ?? 'blank';
-        unset($validated['source'], $validated['file']);
+        try {
+            $this->importContent($request, $presentation, $importer);
+        } catch (ValidationException $e) {
+            $presentation->delete();
 
-        if ($source === 'file') {
-            $validated = [...$validated, ...$importer->importUpload($request->file('file'))];
-        } elseif ($source === 'link') {
-            $validated = [...$validated, ...$importer->importLink($validated['presentation_url'])];
-        } elseif (empty($validated['slides_data'])) {
-            $validated['slides_data'] = [
-                [
-                    'id' => 1,
-                    'title' => $validated['title'],
-                    'subtitle' => 'Created with PointDex',
-                    'bullets' => ['First slide', 'Navigate with Swipe Right / Left'],
-                ]
-            ];
+            throw $e;
         }
-
-        $presentation = $request->user()->presentations()->create($validated);
 
         return redirect()->route('presentations.show', $presentation->id)
             ->with('success', 'Presentation created successfully!');
@@ -99,13 +68,11 @@ class PresentationController extends Controller
 
     public function update(Request $request, Presentation $presentation)
     {
-        abort_unless($presentation->user_id === $request->user()->id, 403);
+        abort_unless($presentation->isViewableBy($request->user()), 403);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'aspect_ratio' => 'nullable|string|in:16:9,4:3',
-            'slides_data' => 'nullable|array',
         ]);
 
         $presentation->update($validated);
@@ -115,9 +82,11 @@ class PresentationController extends Controller
 
     public function destroy(Presentation $presentation, Request $request, PresentationImporter $importer)
     {
-        abort_unless($presentation->user_id === $request->user()->id, 403);
+        abort_unless($presentation->isViewableBy($request->user()), 403);
 
-        $importer->delete($presentation->file_path);
+        foreach ($presentation->assets as $asset) {
+            $importer->delete($asset->file_path);
+        }
         $presentation->delete();
 
         return redirect()->route('presentations.index')->with('success', 'Presentation deleted.');

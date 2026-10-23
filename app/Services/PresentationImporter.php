@@ -13,10 +13,10 @@ use Symfony\Component\Process\Process;
 use Throwable;
 
 /**
- * Turns an uploaded file or a shared link into a deck the presenter can render.
+ * Turns an uploaded file or a shared link into a presentation asset the presenter can render.
  *
- * PDF decks are rendered with pdf.js and .pptx decks with pptx-preview, both in
- * the browser, so every slide stays controllable by gestures. When LibreOffice
+ * PDF files are rendered with pdf.js, .pptx files with pptx-preview and pictures as images,
+ * all in the browser, so every slide stays controllable by gestures. When LibreOffice
  * is installed, PowerPoint files are converted to PDF first for exact fidelity
  * (and legacy .ppt files become supported).
  */
@@ -24,26 +24,30 @@ class PresentationImporter
 {
     public const MAX_BYTES = 100 * 1024 * 1024;
 
+    public const EXTENSIONS = ['pptx', 'ppt', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+    private const IMAGE_TYPES = ['jpg', 'png', 'gif', 'webp'];
+
     private const DISK = 'local';
 
     /**
-     * @return array{source_type: string, file_path: string, original_filename: string}
+     * @return array{type: string, file_path: string, original_filename: string, page_count: ?int}
      */
-    public function importUpload(UploadedFile $file): array
+    public function importUpload(UploadedFile $file, string $errorField = 'files'): array
     {
         $type = $this->detectType($file->getRealPath());
 
         if (! $type) {
             throw ValidationException::withMessages([
-                'file' => 'This file is not a valid PowerPoint (.pptx, .ppt) or PDF file.',
+                $errorField => "\"{$file->getClientOriginalName()}\" is not a PowerPoint (.pptx, .ppt), PDF or picture (.jpg, .png, .gif, .webp) file.",
             ]);
         }
 
-        return $this->storeDeck($file->getRealPath(), $type, $file->getClientOriginalName(), 'file');
+        return $this->storeAsset($file->getRealPath(), $type, $file->getClientOriginalName(), $errorField);
     }
 
     /**
-     * @return array{source_type: string, file_path: string, original_filename: string}
+     * @return array{type: string, file_path: string, original_filename: string, page_count: ?int, source_url: string}
      */
     public function importLink(string $url): array
     {
@@ -68,14 +72,14 @@ class PresentationImporter
             throw ValidationException::withMessages([
                 'presentation_url' => $isGoogleSlides
                     ? 'Could not open this Google Slides deck. In Google Slides, click Share and set General access to "Anyone with the link".'
-                    : 'That link does not lead to a downloadable PowerPoint or PDF file. Use a direct download link, a Google Slides link, or upload the file instead.',
+                    : 'That link does not lead to a downloadable PowerPoint, PDF or picture. Use a direct download link, a Google Slides link, or upload the file instead.',
             ]);
         }
 
         $name = $isGoogleSlides ? 'Google Slides.pdf' : (basename(parse_url($downloadUrl, PHP_URL_PATH) ?: '') ?: 'presentation.'.$type);
 
         try {
-            return $this->storeDeck($tempPath, $type, $name, 'presentation_url');
+            return [...$this->storeAsset($tempPath, $type, $name, 'presentation_url'), 'source_url' => $url];
         } finally {
             @unlink($tempPath);
         }
@@ -121,13 +125,21 @@ class PresentationImporter
             return null;
         }
 
-        $header = (string) fread($handle, 8);
+        $header = (string) fread($handle, 12);
         $type = null;
 
         if (str_starts_with($header, '%PDF')) {
             $type = 'pdf';
         } elseif (str_starts_with($header, "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")) {
             $type = 'ppt';
+        } elseif (str_starts_with($header, "\x89PNG")) {
+            $type = 'png';
+        } elseif (str_starts_with($header, "\xFF\xD8\xFF")) {
+            $type = 'jpg';
+        } elseif (str_starts_with($header, 'GIF8')) {
+            $type = 'gif';
+        } elseif (str_starts_with($header, 'RIFF') && substr($header, 8, 4) === 'WEBP') {
+            $type = 'webp';
         } elseif (str_starts_with($header, "PK\x03\x04")) {
             // A .pptx is a zip whose central directory (at the end of the file) lists ppt/presentation.xml.
             $tailLength = min(filesize($path), 4 * 1024 * 1024);
@@ -141,10 +153,19 @@ class PresentationImporter
     }
 
     /**
-     * @return array{source_type: string, file_path: string, original_filename: string}
+     * @return array{type: string, file_path: string, original_filename: string, page_count: ?int}
      */
-    private function storeDeck(string $sourcePath, string $type, string $originalName, string $errorField): array
+    private function storeAsset(string $sourcePath, string $type, string $originalName, string $errorField): array
     {
+        if (in_array($type, self::IMAGE_TYPES, true)) {
+            return [
+                'type' => 'image',
+                'file_path' => $this->putFile($sourcePath, $type),
+                'original_filename' => $originalName,
+                'page_count' => 1,
+            ];
+        }
+
         if (in_array($type, ['ppt', 'pptx'], true) && $this->libreOfficePath()) {
             $pdfPath = $this->convertToPdf($sourcePath, $type);
 
@@ -152,7 +173,7 @@ class PresentationImporter
                 $stored = $this->putFile($pdfPath, 'pdf');
                 File::deleteDirectory(dirname($pdfPath));
 
-                return ['source_type' => 'pdf', 'file_path' => $stored, 'original_filename' => $originalName];
+                return ['type' => 'pdf', 'file_path' => $stored, 'original_filename' => $originalName, 'page_count' => null];
             }
         }
 
@@ -163,9 +184,10 @@ class PresentationImporter
         }
 
         return [
-            'source_type' => $type,
+            'type' => $type,
             'file_path' => $this->putFile($sourcePath, $type),
             'original_filename' => $originalName,
+            'page_count' => null,
         ];
     }
 

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { loadBuffer, loadPdf, renderPdfPage } from '@/Services/AssetLoader';
 
 // Tracks the pixel size of an element so slides can be scaled to fit it.
-function useElementSize(ref) {
+export function useElementSize(ref) {
     const [size, setSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
@@ -32,14 +32,15 @@ function DeckStatus({ loading, error }) {
         return (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-clay-cream space-y-2">
                 <Loader2 className="w-8 h-8 animate-spin text-clay-gold" />
-                <span className="text-xs font-semibold">Loading presentation...</span>
+                <span className="text-xs font-semibold">Loading slide...</span>
             </div>
         );
     }
     return null;
 }
 
-export function PdfDeck({ url, slideIndex, onLoad = () => {} }) {
+// slideIndex is null while this file is not the one on screen; the last page stays rendered.
+export function PdfDeck({ url, slideIndex }) {
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const { width, height } = useElementSize(containerRef);
@@ -48,57 +49,20 @@ export function PdfDeck({ url, slideIndex, onLoad = () => {} }) {
 
     useEffect(() => {
         let cancelled = false;
-        let loadingTask = null;
-
-        (async () => {
-            try {
-                const pdfjs = await import('pdfjs-dist');
-                pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-                loadingTask = pdfjs.getDocument({ url, withCredentials: true });
-                const doc = await loadingTask.promise;
-                if (cancelled) return;
-                setPdf(doc);
-                onLoad(doc.numPages);
-            } catch (e) {
+        loadPdf(url)
+            .then((doc) => !cancelled && setPdf(doc))
+            .catch((e) => {
                 console.error(e);
                 if (!cancelled) setError('Could not open this PDF.');
-            }
-        })();
-
+            });
         return () => {
             cancelled = true;
-            loadingTask?.destroy();
         };
     }, [url]);
 
     useEffect(() => {
-        if (!pdf || !width || !height) return;
-        let renderTask = null;
-        let cancelled = false;
-
-        (async () => {
-            const page = await pdf.getPage(Math.min(slideIndex + 1, pdf.numPages));
-            if (cancelled) return;
-
-            const base = page.getViewport({ scale: 1 });
-            const fit = Math.min(width / base.width, height / base.height);
-            const ratio = window.devicePixelRatio || 1;
-            const viewport = page.getViewport({ scale: fit * ratio });
-
-            const canvas = canvasRef.current;
-            canvas.width = Math.floor(viewport.width);
-            canvas.height = Math.floor(viewport.height);
-            canvas.style.width = `${Math.floor(base.width * fit)}px`;
-            canvas.style.height = `${Math.floor(base.height * fit)}px`;
-
-            renderTask = page.render({ canvas, viewport });
-            await renderTask.promise.catch(() => {});
-        })();
-
-        return () => {
-            cancelled = true;
-            renderTask?.cancel();
-        };
+        if (!pdf || !width || !height || slideIndex == null) return;
+        return renderPdfPage(pdf, slideIndex, canvasRef.current, width, height);
     }, [pdf, slideIndex, width, height]);
 
     return (
@@ -113,10 +77,11 @@ export function PdfDeck({ url, slideIndex, onLoad = () => {} }) {
 const PPTX_WIDTH = 960;
 const PPTX_HEIGHT = 540;
 
-export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
+export function PptxDeck({ url, slideIndex }) {
     const containerRef = useRef(null);
     const hostRef = useRef(null);
     const previewerRef = useRef(null);
+    const renderedIndexRef = useRef(null);
     const { width, height } = useElementSize(containerRef);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState(null);
@@ -124,15 +89,11 @@ export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
     useEffect(() => {
         let cancelled = false;
         const host = hostRef.current;
+        renderedIndexRef.current = null;
 
         (async () => {
             try {
-                const [{ init }, response] = await Promise.all([
-                    import('pptx-preview'),
-                    fetch(url, { credentials: 'same-origin' }),
-                ]);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const buffer = await response.arrayBuffer();
+                const [{ init }, buffer] = await Promise.all([import('pptx-preview'), loadBuffer(url)]);
                 if (cancelled) return;
 
                 const previewer = init(host, { width: PPTX_WIDTH, height: PPTX_HEIGHT, mode: 'slide' });
@@ -140,9 +101,7 @@ export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
                 if (cancelled) return;
 
                 previewerRef.current = previewer;
-                previewer.renderSingleSlide(0);
                 setReady(true);
-                onLoad(previewer.slideCount);
             } catch (e) {
                 console.error(e);
                 if (!cancelled) {
@@ -153,11 +112,6 @@ export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
 
         return () => {
             cancelled = true;
-            try {
-                previewerRef.current?.destroy();
-            } catch (e) {
-                // ignore: the previewer may not have finished loading
-            }
             previewerRef.current = null;
             host.innerHTML = '';
         };
@@ -165,10 +119,11 @@ export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
 
     useEffect(() => {
         const previewer = previewerRef.current;
-        if (!ready || !previewer) return;
+        if (!ready || !previewer || slideIndex == null) return;
         const index = Math.min(slideIndex, previewer.slideCount - 1);
-        if (index !== previewer.currentIndex) {
+        if (index !== renderedIndexRef.current) {
             previewer.renderSingleSlide(index);
+            renderedIndexRef.current = index;
         }
     }, [ready, slideIndex]);
 
@@ -186,6 +141,128 @@ export function PptxDeck({ url, slideIndex, onLoad = () => {} }) {
                 }}
             />
             <DeckStatus loading={!ready} error={error} />
+        </div>
+    );
+}
+
+export function ImageSlide({ url, alt }) {
+    return (
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <img src={url} alt={alt} className="max-w-full max-h-full object-contain" draggable={false} />
+        </div>
+    );
+}
+
+/* ---------- Thumbnails ---------- */
+
+export function PdfThumbnail({ url, page }) {
+    const containerRef = useRef(null);
+    const canvasRef = useRef(null);
+    const { width, height } = useElementSize(containerRef);
+
+    useEffect(() => {
+        if (!width || !height) return;
+        let cancelRender = null;
+        let cancelled = false;
+        loadPdf(url)
+            .then((doc) => {
+                if (!cancelled) cancelRender = renderPdfPage(doc, page, canvasRef.current, width, height);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+            cancelRender?.();
+        };
+    }, [url, page, width, height]);
+
+    return (
+        <div ref={containerRef} className="absolute inset-0 flex items-center justify-center">
+            <canvas ref={canvasRef} className="block" />
+        </div>
+    );
+}
+
+/**
+ * Renders every slide of a PowerPoint once, off screen, and hands the slide elements
+ * to the thumbnails (and the slide count to the page).
+ */
+export function PptxThumbnailSource({ asset, onReady, onError }) {
+    const hostRef = useRef(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const hostEl = hostRef.current;
+
+        (async () => {
+            try {
+                const [{ init }, buffer] = await Promise.all([import('pptx-preview'), loadBuffer(asset.url)]);
+                if (cancelled) return;
+
+                const previewer = init(hostEl, { width: PPTX_WIDTH, mode: 'list' });
+                await previewer.preview(buffer);
+                if (cancelled) return;
+
+                const nodes = Array.from({ length: previewer.slideCount }, (_, i) =>
+                    hostEl.querySelector(`.pptx-preview-slide-wrapper-${i}`),
+                );
+                onReady(asset, nodes);
+            } catch (e) {
+                console.error(e);
+                if (!cancelled) onError(asset);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            hostEl.innerHTML = '';
+        };
+    }, [asset.url]);
+
+    return (
+        <div
+            ref={hostRef}
+            aria-hidden="true"
+            className="fixed pointer-events-none opacity-0"
+            style={{ left: -20000, top: 0, width: PPTX_WIDTH }}
+        />
+    );
+}
+
+export function PptxThumbnail({ node }) {
+    const slotRef = useRef(null);
+    const innerRef = useRef(null);
+    const { width, height } = useElementSize(slotRef);
+
+    useEffect(() => {
+        const inner = innerRef.current;
+        if (!node || !inner) return;
+        node.style.margin = '0';
+        inner.appendChild(node);
+        return () => {
+            if (node.parentNode === inner) inner.removeChild(node);
+        };
+    }, [node]);
+
+    const nodeWidth = parseFloat(node?.style.width) || PPTX_WIDTH;
+    const nodeHeight = parseFloat(node?.style.height) || PPTX_HEIGHT;
+    const scale = width && height ? Math.min(width / nodeWidth, height / nodeHeight) : 0;
+
+    return (
+        <div ref={slotRef} className="absolute inset-0 overflow-hidden">
+            <div
+                ref={innerRef}
+                className="absolute left-1/2 top-1/2 pointer-events-none"
+                style={{
+                    width: nodeWidth,
+                    height: nodeHeight,
+                    transform: `translate(-50%, -50%) scale(${scale})`,
+                }}
+            />
+            {!node && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 animate-spin text-clay-gold" />
+                </div>
+            )}
         </div>
     );
 }

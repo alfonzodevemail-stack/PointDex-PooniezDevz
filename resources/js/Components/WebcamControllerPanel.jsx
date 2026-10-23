@@ -98,19 +98,15 @@ export default function WebcamControllerPanel({
                 onGesture(gesture);
 
                 if (sessionCode) {
-                    fetch('/api/telemetry/log', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({
-                            session_code: sessionCode,
-                            gesture_type: gesture.type,
-                            confidence: gesture.confidence / 100,
-                            latency_ms: latencyRef.current,
-                            dispatched_key: gesture.key,
-                            delta_x: gesture.deltaX,
-                            delta_y: gesture.deltaY,
-                            is_successful: true
-                        })
+                    window.axios.post('/telemetry/log', {
+                        session_code: sessionCode,
+                        gesture_type: gesture.type,
+                        confidence: gesture.confidence / 100,
+                        latency_ms: latencyRef.current,
+                        dispatched_key: gesture.key,
+                        delta_x: gesture.deltaX,
+                        delta_y: gesture.deltaY,
+                        is_successful: true
                     }).catch(() => {});
                 }
 

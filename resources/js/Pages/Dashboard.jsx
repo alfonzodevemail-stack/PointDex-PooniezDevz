@@ -26,11 +26,11 @@ export default function Dashboard({ presentations = [], stats = {} }) {
 
                         <div className="flex flex-wrap items-center gap-3 pt-2">
                             <Link
-                                href="/presentations/1"
+                                href="/presentations"
                                 className="clay-btn-gold px-5 py-2.5 text-xs inline-flex items-center space-x-2"
                             >
-                                <Play className="w-4 h-4 fill-clay-charcoal" />
-                                <span>Open Task Tamer Demo</span>
+                                <Presentation className="w-4 h-4" />
+                                <span>My Presentations</span>
                             </Link>
 
                             <Link
@@ -100,10 +100,10 @@ export default function Dashboard({ presentations = [], stats = {} }) {
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-clay-gold text-clay-charcoal uppercase">
-                                            {item.is_sample ? 'Sample' : 'Deck'}
+                                            Deck
                                         </span>
                                         <span className="text-xs font-mono font-bold text-clay-charcoal/70">
-                                            {item.slides_data?.length || 1} slides
+                                            {item.slides_data?.length || 0} slides
                                         </span>
                                     </div>
 

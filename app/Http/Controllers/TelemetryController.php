@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 
 use App\Models\TelemetrySession;
 use App\Models\GestureLog;
+use App\Models\Presentation;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -20,8 +21,12 @@ class TelemetryController extends Controller
             'distance_meters' => 'nullable|numeric|min:0.5|max:5',
         ]);
 
+        if (! empty($validated['presentation_id'])) {
+            abort_unless(Presentation::find($validated['presentation_id'])->isViewableBy($request->user()), 403);
+        }
+
         $session = TelemetrySession::create([
-            'user_id' => $request->user()?->id,
+            'user_id' => $request->user()->id,
             'presentation_id' => $validated['presentation_id'] ?? null,
             'session_code' => 'PDX-' . strtoupper(Str::random(6)),
             'mode' => $validated['mode'] ?? 'presentation',
@@ -49,7 +54,7 @@ class TelemetryController extends Controller
             'delta_y' => 'nullable|numeric',
         ]);
 
-        $session = TelemetrySession::where('session_code', $validated['session_code'])->firstOrFail();
+        $session = $request->user()->telemetrySessions()->where('session_code', $validated['session_code'])->firstOrFail();
 
         $log = $session->logs()->create([
             'gesture_type' => $validated['gesture_type'],
@@ -82,7 +87,7 @@ class TelemetryController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $session = TelemetrySession::where('session_code', $validated['session_code'])->firstOrFail();
+        $session = $request->user()->telemetrySessions()->where('session_code', $validated['session_code'])->firstOrFail();
 
         $session->update([
             'total_frames_processed' => $validated['total_frames_processed'] ?? $session->total_frames_processed,
@@ -101,20 +106,24 @@ class TelemetryController extends Controller
 
     public function analytics(Request $request)
     {
-        $sessions = TelemetrySession::with(['presentation', 'logs'])
+        // Every figure on this page is limited to the signed-in user's own sessions.
+        $userSessions = $request->user()->telemetrySessions();
+        $userLogs = GestureLog::whereIn('telemetry_session_id', $request->user()->telemetrySessions()->select('id'));
+
+        $sessions = (clone $userSessions)->with(['presentation', 'logs'])
             ->latest()
             ->take(20)
             ->get();
 
-        $totalSessions = TelemetrySession::count();
-        $totalGestures = GestureLog::count();
-        $avgLatency = round(GestureLog::avg('latency_ms') ?: 0, 1);
-        $avgFps = round(TelemetrySession::avg('avg_fps') ?: 0, 1);
-        $successfulGestures = GestureLog::where('is_successful', true)->count();
+        $totalSessions = (clone $userSessions)->count();
+        $totalGestures = (clone $userLogs)->count();
+        $avgLatency = round((clone $userLogs)->avg('latency_ms') ?: 0, 1);
+        $avgFps = round((clone $userSessions)->avg('avg_fps') ?: 0, 1);
+        $successfulGestures = (clone $userLogs)->where('is_successful', true)->count();
         $accuracyRate = $totalGestures > 0 ? round(($successfulGestures / $totalGestures) * 100, 1) : 0;
 
         // Group by gesture type
-        $gestureCounts = GestureLog::selectRaw('gesture_type, count(*) as count, avg(latency_ms) as avg_latency')
+        $gestureCounts = (clone $userLogs)->selectRaw('gesture_type, count(*) as count, avg(latency_ms) as avg_latency')
             ->groupBy('gesture_type')
             ->get();
 
